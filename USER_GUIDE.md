@@ -22,11 +22,14 @@ IO7_APP_ID=app3
 IO7_TOKEN=app3
 # IO7_PORT=1883      # optional, default 1883 (or 8883 with TLS)
 # IO7_CA=ca.pem      # optional, enables TLS on 8883
+# IO7_LOG=ERROR      # DEBUG | INFO | WARNING | ERROR | CRITICAL (default ERROR)
 ```
 
 TLS is auto-detected: if `IO7_CA` is set, or if a file named `ca.pem` exists in the working directory, the connection upgrades to TLS on port 8883. Same convention as `io7lab/IO7FuPython`.
 
-Tested by: `test_app.py::test_env_loaded`, `test_app.py::test_tls_auto_detect_from_kwarg`, `::test_tls_auto_detect_from_env`, `::test_tls_auto_detect_from_capem_in_cwd`, `::test_no_tls_default_port_1883`.
+**Logging.** Set `IO7_LOG=DEBUG` (or `INFO`) when developing — you'll see registered handlers, every received message with handler count, every command published, and inject fires. Defaults to `ERROR` so a production app stays quiet. You can also override per-instance: `App(log_level="DEBUG")`. The framework only configures its own `io7app` logger and adds a stream handler if you don't already have one — your own logging setup is left alone.
+
+Tested by: `test_app.py::test_env_loaded`, `test_app.py::test_tls_auto_detect_from_kwarg`, `::test_tls_auto_detect_from_env`, `::test_tls_auto_detect_from_capem_in_cwd`, `::test_no_tls_default_port_1883`, `::test_log_level_default_is_error`, `::test_log_level_from_env`, `::test_log_level_kwarg_wins`, `::test_log_level_invalid_rejected`.
 
 ---
 

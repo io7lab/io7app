@@ -18,6 +18,31 @@ class _DropMessage(Exception):
     """Internal: raise to indicate a message should be silently dropped."""
 
 
+_VALID_LOG_LEVELS = ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
+
+
+def _configure_logger(level_name: str) -> None:
+    """Set the io7app logger level and ensure it has at least one handler.
+    Idempotent — safe to call multiple times. Does not touch the root logger."""
+    name = (level_name or "ERROR").upper()
+    if name not in _VALID_LOG_LEVELS:
+        raise ValueError(
+            f"IO7_LOG must be one of {', '.join(_VALID_LOG_LEVELS)}, got {level_name!r}"
+        )
+    logger = logging.getLogger("io7app")
+    logger.setLevel(getattr(logging, name))
+    # Add a stream handler only when no logging is configured at all
+    # (no handlers on us AND no handlers on root). Keep propagate=True so
+    # pytest's caplog and any user-installed handlers still see our records.
+    if not logger.handlers and not logging.getLogger().handlers:
+        h = logging.StreamHandler()
+        h.setFormatter(logging.Formatter(
+            "%(asctime)s %(levelname)s io7app: %(message)s",
+            datefmt="%H:%M:%S",
+        ))
+        logger.addHandler(h)
+
+
 def _build_mqtt_client(app_id: str, token: str, ca: str | None) -> mqtt.Client:
     # paho 2.x prefers VERSION2 callbacks (V1 is deprecated).
     # paho 1.x has no CallbackAPIVersion at all.
@@ -38,6 +63,7 @@ class App:
         token: Optional[str] = None,
         port: Optional[int] = None,
         ca: Optional[str] = None,
+        log_level: Optional[str] = None,
         env_path: str = ".env",
         _connect: bool = True,  # test hook to skip MQTT connect
     ):
@@ -45,7 +71,10 @@ class App:
         if env_path and os.path.exists(env_path):
             load_dotenv(env_path, override=False)
 
-        # 2. Resolve config: kwargs > env vars
+        # 2. Configure logger (kwarg > IO7_LOG env > default ERROR)
+        _configure_logger(log_level or os.getenv("IO7_LOG") or "ERROR")
+
+        # 3. Resolve config: kwargs > env vars
         self.server = server or os.getenv("IO7_SERVER")
         self.app_id = app_id or os.getenv("IO7_APP_ID")
         self.token = token or os.getenv("IO7_TOKEN")
@@ -113,6 +142,8 @@ class App:
         def decorator(fn):
             name = fn.__name__
             is_new = self._router.add(pattern, fn, name)
+            log.info("registered %r on %s%s", name, pattern,
+                     "" if is_new else " (existing pattern)")
             if is_new and self._client is not None:
                 self._client.subscribe(pattern)
             return fn
@@ -122,6 +153,7 @@ class App:
         topic = msg.topic
         raw = msg.payload
         entries = self._router.dispatch(topic)
+        log.debug("recv %s (%d bytes) -> %d handler(s)", topic, len(raw), len(entries))
         if not entries:
             return
         for entry in entries:
@@ -197,6 +229,7 @@ class App:
             payload = data.encode() if isinstance(data, str) else bytes(data)
         else:
             payload = data  # caller passes bytes for raw fmts
+        log.debug("send_cmd %s (%d bytes)", topic, len(payload))
         self._client.publish(topic, payload, qos=qos, retain=retain)
 
     def publish(self, topic: str, payload, *,
@@ -224,9 +257,11 @@ class App:
         emptied = self._router.remove_by_name(name)
         if self._client is not None:
             for pattern in emptied:
+                log.info("unsubscribe %s (handler %r removed)", pattern, name)
                 self._client.unsubscribe(pattern)
         # Cancel any inject by this name
-        self._scheduler.cancel(name)
+        if self._scheduler.cancel(name):
+            log.info("inject %r cancelled", name)
 
     def run(self, _block: bool = True):
         """Connect to broker, start scheduler, block on the MQTT loop."""

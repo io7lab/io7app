@@ -25,8 +25,8 @@ def _load(modname, app_fixture, monkeypatch):
 
 def test_switch_lamp(app, fake_client, monkeypatch):
     _load("01_switch_lamp", app, monkeypatch)
-    assert "iot3/switch1/evt/status/fmt/json" in fake_client.subscribed
-    fake_client.deliver("iot3/switch1/evt/status/fmt/json",
+    assert "iot3/sw1/evt/status/fmt/json" in fake_client.subscribed
+    fake_client.deliver("iot3/sw1/evt/status/fmt/json",
                         '{"d": {"switch": "on"}}')
     assert any(t == "iot3/lamp1/cmd/lamp/fmt/json"
                for t, *_ in fake_client.published)

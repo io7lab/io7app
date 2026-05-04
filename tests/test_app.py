@@ -86,6 +86,51 @@ def test_explicit_port_overrides_default(tmp_path, monkeypatch):
     assert app.port == 9999
 
 
+# --- IO7_LOG / log_level handling ---
+
+def test_log_level_default_is_error(tmp_path, monkeypatch):
+    import logging
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("IO7_SERVER", "h")
+    monkeypatch.setenv("IO7_APP_ID", "a")
+    monkeypatch.setenv("IO7_TOKEN", "t")
+    monkeypatch.delenv("IO7_LOG", raising=False)
+    App(_connect=False)
+    assert logging.getLogger("io7app").level == logging.ERROR
+
+
+def test_log_level_from_env(tmp_path, monkeypatch):
+    import logging
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("IO7_SERVER", "h")
+    monkeypatch.setenv("IO7_APP_ID", "a")
+    monkeypatch.setenv("IO7_TOKEN", "t")
+    monkeypatch.setenv("IO7_LOG", "DEBUG")
+    App(_connect=False)
+    assert logging.getLogger("io7app").level == logging.DEBUG
+
+
+def test_log_level_kwarg_wins(tmp_path, monkeypatch):
+    import logging
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("IO7_SERVER", "h")
+    monkeypatch.setenv("IO7_APP_ID", "a")
+    monkeypatch.setenv("IO7_TOKEN", "t")
+    monkeypatch.setenv("IO7_LOG", "ERROR")
+    App(log_level="INFO", _connect=False)
+    assert logging.getLogger("io7app").level == logging.INFO
+
+
+def test_log_level_invalid_rejected(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("IO7_SERVER", "h")
+    monkeypatch.setenv("IO7_APP_ID", "a")
+    monkeypatch.setenv("IO7_TOKEN", "t")
+    monkeypatch.setenv("IO7_LOG", "VERBOSE")
+    with pytest.raises(ValueError):
+        App(_connect=False)
+
+
 def test_paho_client_built_with_credentials(app, fake_client):
     assert fake_client.username_pw == ("testapp", "t")
 
