@@ -27,7 +27,21 @@ IO7_TOKEN=app3
 
 TLS is auto-detected: if `IO7_CA` is set, or if a file named `ca.pem` exists in the working directory, the connection upgrades to TLS on port 8883. Same convention as `io7lab/IO7FuPython`.
 
-**Logging.** Set `IO7_LOG=DEBUG` (or `INFO`) when developing — you'll see registered handlers, every received message with handler count, every command published, and inject fires. Defaults to `ERROR` so a production app stays quiet. You can also override per-instance: `App(log_level="DEBUG")`. The framework only configures its own `io7app` logger and adds a stream handler if you don't already have one — your own logging setup is left alone.
+**Logging.** Set `IO7_LOG=DEBUG` (or `INFO`) when developing — you'll see registered handlers, every received message, every command published, and inject fires. Defaults to `ERROR` so a production app stays quiet. You can also override per-instance: `App(log_level="DEBUG")`.
+
+What DEBUG output looks like:
+
+```
+14:32:48 INFO  io7app: io7 connected as app3
+14:32:48 INFO  io7app: registered 'thermostat' on iot3/thermo1/evt/status/fmt/json
+14:32:49 DEBUG io7app: recv iot3/thermo1/evt/status/fmt/json thermostat({"d":{"temperature":24.4,"target":27}})
+14:32:49 DEBUG io7app: send_cmd {"d": {"valve": "on"}} -> iot3/valve1/cmd/valve/fmt/json
+14:33:00 DEBUG io7app: inject 'morning' fire payload={'lamp': 'on'}
+```
+
+Each `recv` line shows the topic, then the handler call(s) the framework is about to invoke (`handler(payload)`). `send_cmd` lines mirror the flow direction (`payload -> topic`). Multiple handlers on the same topic stack as `h1(payload), h2(payload)`. Payloads over 200 chars are truncated.
+
+The framework only configures its own `io7app` logger and adds a stream handler if no logging is configured anywhere — your own logging setup is left alone, and pytest's `caplog` works as expected.
 
 Tested by: `test_app.py::test_env_loaded`, `test_app.py::test_tls_auto_detect_from_kwarg`, `::test_tls_auto_detect_from_env`, `::test_tls_auto_detect_from_capem_in_cwd`, `::test_no_tls_default_port_1883`, `::test_log_level_default_is_error`, `::test_log_level_from_env`, `::test_log_level_kwarg_wins`, `::test_log_level_invalid_rejected`.
 
