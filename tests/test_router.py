@@ -74,3 +74,76 @@ def test_subsumes_truth_table():
     # + is exactly one segment, # is many; + does not subsume #
     assert not _subsumes("a/+", "a/#")
     assert _subsumes("a/#", "a/+")        # # broader than +
+
+
+import logging
+
+
+def test_consolidation_exact_dup(caplog):
+    r = Router()
+    def h(t, p): pass
+    r.add("iot3/lamp1/evt/status/fmt/json", h, "h")
+    with caplog.at_level(logging.WARNING, logger="io7app"):
+        added = r.add("iot3/lamp1/evt/status/fmt/json", h, "h")
+    assert added is False  # not a new pattern
+    assert len(r.dispatch("iot3/lamp1/evt/status/fmt/json")) == 1  # only one entry
+    assert any("already registered" in rec.message for rec in caplog.records)
+
+
+def test_consolidation_subsumed(caplog):
+    r = Router()
+    def h(t, p): pass
+    r.add("iot3/+/evt/+/fmt/json", h, "h")
+    with caplog.at_level(logging.WARNING, logger="io7app"):
+        r.add("iot3/lamp1/evt/status/fmt/json", h, "h")
+    # Narrower pattern dropped
+    assert r.dispatch("iot3/lamp1/evt/status/fmt/json")  # still matches via broader
+    assert all(e.pattern == "iot3/+/evt/+/fmt/json" for e in r.dispatch("iot3/lamp1/evt/status/fmt/json"))
+    assert any("covered by" in rec.message for rec in caplog.records)
+
+
+def test_consolidation_replace_narrower(caplog):
+    r = Router()
+    def h(t, p): pass
+    r.add("iot3/lamp1/evt/status/fmt/json", h, "h")
+    with caplog.at_level(logging.WARNING, logger="io7app"):
+        r.add("iot3/+/evt/+/fmt/json", h, "h")
+    entries = r.dispatch("iot3/lamp1/evt/status/fmt/json")
+    assert len(entries) == 1
+    assert entries[0].pattern == "iot3/+/evt/+/fmt/json"  # narrower replaced
+    assert any("subsumes existing" in rec.message for rec in caplog.records)
+
+
+def test_consolidation_pure_overlap_warns(caplog):
+    r = Router()
+    def h(t, p): pass
+    r.add("iot3/lamp1/#", h, "h")
+    with caplog.at_level(logging.WARNING, logger="io7app"):
+        r.add("iot3/+/evt/status/fmt/json", h, "h")
+    # Both kept
+    matches = r.dispatch("iot3/lamp1/evt/status/fmt/json")
+    assert len(matches) == 2
+    assert any("may fire twice" in rec.message for rec in caplog.records)
+
+
+def test_consolidation_disjoint_silent(caplog):
+    r = Router()
+    def h(t, p): pass
+    r.add("iot3/lamp1/#", h, "h")
+    with caplog.at_level(logging.WARNING, logger="io7app"):
+        r.add("iot3/thermo1/#", h, "h")
+    assert caplog.records == []  # no warnings
+
+
+def test_consolidation_only_within_same_name(caplog):
+    """Different handler names with overlapping patterns -- no consolidation."""
+    r = Router()
+    def a(t, p): pass
+    def b(t, p): pass
+    r.add("iot3/+/#", a, "a")
+    with caplog.at_level(logging.WARNING, logger="io7app"):
+        r.add("iot3/lamp1/evt/status/fmt/json", b, "b")
+    # Both kept; no warning
+    assert caplog.records == []
+    matches = r.dispatch("iot3/lamp1/evt/status/fmt/json")
+    assert len(matches) == 2

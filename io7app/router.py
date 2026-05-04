@@ -1,7 +1,10 @@
 """Topic router: matching + registration consolidation."""
 from collections import namedtuple
 from typing import Callable
+import logging
 import re
+
+log = logging.getLogger("io7app")
 
 Entry = namedtuple("Entry", ["handler", "name", "pattern", "fmt"])
 
@@ -14,7 +17,6 @@ def _fmt_of(pattern: str) -> str | None:
 
 
 def _wildcard_kind(pattern: str) -> str:
-    """Returns 'exact', 'single', or 'multi'."""
     parts = pattern.split("/")
     if parts[-1] == "#":
         return "multi"
@@ -37,7 +39,6 @@ def _compile(pattern: str) -> re.Pattern:
 
 
 def _subsumes(broader: str, narrower: str) -> bool:
-    """True if every topic matching `narrower` also matches `broader`."""
     b = broader.split("/")
     n = narrower.split("/")
     bi = ni = 0
@@ -45,9 +46,9 @@ def _subsumes(broader: str, narrower: str) -> bool:
         bs = b[bi]
         ns = n[ni]
         if bs == "#":
-            return True  # remaining n consumed by #
+            return True
         if ns == "#":
-            return False  # broader ran out of generality
+            return False
         if bs == "+":
             bi += 1; ni += 1
             continue
@@ -65,6 +66,50 @@ class Router:
         self._multi: list[tuple[re.Pattern, list[Entry], str]] = []
 
     def add(self, pattern: str, handler: Callable, name: str) -> bool:
+        """Register (pattern, handler, name). Apply consolidation rules.
+        Returns True if the pattern is newly subscribed (caller should subscribe).
+        """
+        # Find existing patterns for this name
+        existing = [p for p in self._patterns_for_name(name)]
+
+        for ep in existing:
+            if ep == pattern:
+                log.warning(
+                    "handler %r already registered with pattern %r; ignoring duplicate",
+                    name, pattern,
+                )
+                return False
+            if _subsumes(ep, pattern):
+                log.warning(
+                    "handler %r new pattern %r is covered by existing %r; ignoring",
+                    name, pattern, ep,
+                )
+                return False
+
+        # Detect "existing is subsumed by new" -- replace
+        replaced_any = False
+        for ep in list(existing):
+            if _subsumes(pattern, ep) and ep != pattern:
+                log.warning(
+                    "handler %r new pattern %r subsumes existing %r; replacing",
+                    name, pattern, ep,
+                )
+                self._remove_entry_for_name(ep, name)
+                replaced_any = True
+
+        # Pure-overlap warning (no subsumption either way, but plausibly overlap)
+        for ep in self._patterns_for_name(name):
+            if ep == pattern:
+                continue
+            if not _subsumes(ep, pattern) and not _subsumes(pattern, ep):
+                if self._may_overlap(ep, pattern):
+                    log.warning(
+                        "handler %r patterns %r and %r may both match some topics "
+                        "-- handler may fire twice for those topics",
+                        name, ep, pattern,
+                    )
+
+        # Insert
         entry = Entry(handler, name, pattern, _fmt_of(pattern))
         kind = _wildcard_kind(pattern)
         if kind == "exact":
@@ -89,3 +134,51 @@ class Router:
             if rgx.match(topic):
                 out.extend(entries)
         return out
+
+    # --- internals ---
+
+    def _patterns_for_name(self, name: str) -> list[str]:
+        out: list[str] = []
+        for p, entries in self._exact.items():
+            if any(e.name == name for e in entries):
+                out.append(p)
+        for _, entries, p in self._single:
+            if any(e.name == name for e in entries):
+                out.append(p)
+        for _, entries, p in self._multi:
+            if any(e.name == name for e in entries):
+                out.append(p)
+        return out
+
+    def _remove_entry_for_name(self, pattern: str, name: str) -> None:
+        if pattern in self._exact:
+            self._exact[pattern] = [e for e in self._exact[pattern] if e.name != name]
+            if not self._exact[pattern]:
+                del self._exact[pattern]
+            return
+        for bucket in (self._single, self._multi):
+            for i, (rgx, entries, p) in enumerate(bucket):
+                if p == pattern:
+                    new_entries = [e for e in entries if e.name != name]
+                    if not new_entries:
+                        bucket.pop(i)
+                    else:
+                        bucket[i] = (rgx, new_entries, p)
+                    return
+
+    @staticmethod
+    def _may_overlap(a: str, b: str) -> bool:
+        """Heuristic: returns False if patterns are provably disjoint by a literal mismatch.
+        Both must contain wildcards to be considered overlapping."""
+        if not (("+" in a or "#" in a) and ("+" in b or "#" in b)):
+            return False
+        ap = a.split("/")
+        bp = b.split("/")
+        for as_, bs in zip(ap, bp):
+            if as_ == "#" or bs == "#":
+                return True
+            if as_ == "+" or bs == "+":
+                continue
+            if as_ != bs:
+                return False
+        return True
