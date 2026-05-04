@@ -36,6 +36,8 @@ class Scheduler:
             )
         if at is not None:
             self._next_fire_for_at(at)  # validate now, raises on bad format
+        if cron is not None:
+            self._next_fire_for_cron(cron)  # validates + checks croniter installed
         if name in self._jobs:
             raise ValueError(f"duplicate inject name {name!r}")
         job = _Job(name=name, fn=fn, every=every, cron=cron, at=at,
@@ -91,6 +93,15 @@ class Scheduler:
                         return
                 self._fire(job)
             return
+        if job.cron is not None:
+            while not job.stop_event.is_set():
+                next_at = self._next_fire_for_cron(job.cron)
+                wait = (next_at - dt.datetime.now()).total_seconds()
+                if wait > 0:
+                    if job.stop_event.wait(wait):
+                        return
+                self._fire(job)
+            return
 
     @staticmethod
     def _next_fire_for_at(at: str, now: dt.datetime | None = None) -> dt.datetime:
@@ -105,6 +116,20 @@ class Scheduler:
         if candidate <= now:
             candidate += dt.timedelta(days=1)
         return candidate
+
+    @staticmethod
+    def _next_fire_for_cron(cron: str, now: dt.datetime | None = None) -> dt.datetime:
+        try:
+            from croniter import croniter
+        except ImportError as e:
+            raise ImportError(
+                "croniter is required for @inject(cron=...). "
+                "Install it with: pip install croniter"
+            ) from e
+        if not croniter.is_valid(cron):
+            raise ValueError(f"invalid cron expression: {cron!r}")
+        now = now or dt.datetime.now()
+        return croniter(cron, now).get_next(dt.datetime)
 
     def _fire(self, job: _Job):
         try:

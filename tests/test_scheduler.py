@@ -73,3 +73,33 @@ def test_at_mode_invalid_format_rejected():
     s = Scheduler()
     with pytest.raises(ValueError):
         s.schedule("f", lambda p: None, at="not-a-time")
+
+
+import pytest
+
+
+def test_cron_mode_validates_at_register():
+    s = Scheduler()
+    with pytest.raises(ValueError):
+        s.schedule("f", lambda p: None, cron="not a cron")
+
+
+def test_cron_mode_fires(monkeypatch):
+    """Use a cron that fires every minute, then accelerate by mocking time waits."""
+    pytest.importorskip("croniter")
+    s = Scheduler()
+    calls = []
+    def f(payload): calls.append(time.time())
+
+    # We can't wait a real minute. Instead patch _next_fire_for_cron to return
+    # a time ~0.05s ahead each call so the loop fires quickly.
+    real = s._next_fire_for_cron
+    def fast(_cron):
+        return dt.datetime.now() + dt.timedelta(seconds=0.05)
+    s._next_fire_for_cron = fast  # type: ignore
+
+    s.schedule("f", f, cron="* * * * *")
+    s.start()
+    time.sleep(0.25)
+    s.stop()
+    assert len(calls) >= 3
