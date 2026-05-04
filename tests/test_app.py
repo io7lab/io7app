@@ -88,3 +88,108 @@ def test_explicit_port_overrides_default(tmp_path, monkeypatch):
 
 def test_paho_client_built_with_credentials(app, fake_client):
     assert fake_client.username_pw == ("testapp", "t")
+
+
+# --- Task 15: @app.on decorator + envelope unwrap + signature dispatch ---
+
+def test_on_decorator_registers_and_subscribes(app, fake_client):
+    @app.on("iot3/lamp1/evt/status/fmt/json")
+    def h(data):
+        pass
+    assert "iot3/lamp1/evt/status/fmt/json" in fake_client.subscribed
+
+
+def test_unwraps_d(app, fake_client):
+    seen = []
+    @app.on("iot3/lamp1/evt/status/fmt/json")
+    def h(data):
+        seen.append(data)
+    fake_client.deliver("iot3/lamp1/evt/status/fmt/json",
+                        '{"d": {"lamp": "on"}, "t": 123}')
+    assert seen == [{"lamp": "on"}]
+
+
+def test_drops_when_no_d(app, fake_client):
+    seen = []
+    @app.on("iot3/lamp1/evt/status/fmt/json")
+    def h(data):
+        seen.append(data)
+    fake_client.deliver("iot3/lamp1/evt/status/fmt/json", '{"oops": "no d"}')
+    assert seen == []
+
+
+def test_drops_when_not_dict(app, fake_client):
+    seen = []
+    @app.on("iot3/lamp1/evt/status/fmt/json")
+    def h(data):
+        seen.append(data)
+    fake_client.deliver("iot3/lamp1/evt/status/fmt/json", '"just a string"')
+    assert seen == []
+
+
+def test_drops_malformed_json(app, fake_client, caplog):
+    import logging
+    seen = []
+    @app.on("iot3/lamp1/evt/status/fmt/json")
+    def h(data):
+        seen.append(data)
+    with caplog.at_level(logging.WARNING, logger="io7app"):
+        fake_client.deliver("iot3/lamp1/evt/status/fmt/json", "{not json")
+    assert seen == []
+    assert any("malformed json" in r.message.lower() for r in caplog.records)
+
+
+def test_signature_one_arg(app, fake_client):
+    seen = []
+    @app.on("iot3/lamp1/evt/status/fmt/json")
+    def h(data):
+        seen.append(data)
+    fake_client.deliver("iot3/lamp1/evt/status/fmt/json", '{"d": {"x": 1}}')
+    assert seen == [{"x": 1}]
+
+
+def test_signature_two_args_topic_data(app, fake_client):
+    seen = []
+    @app.on("iot3/+/evt/+/fmt/json")
+    def h(topic, data):
+        seen.append((topic, data))
+    fake_client.deliver("iot3/lamp1/evt/status/fmt/json", '{"d": {"x": 1}}')
+    assert seen == [("iot3/lamp1/evt/status/fmt/json", {"x": 1})]
+
+
+def test_signature_with_t(app, fake_client):
+    seen = []
+    @app.on("iot3/lamp1/evt/status/fmt/json")
+    def h(data, t):
+        seen.append((data, t))
+    fake_client.deliver(
+        "iot3/lamp1/evt/status/fmt/json", '{"d": {"x": 1}, "t": 999}')
+    assert seen == [({"x": 1}, 999)]
+
+
+def test_signature_with_topic_and_t(app, fake_client):
+    seen = []
+    @app.on("iot3/+/evt/+/fmt/json")
+    def h(topic, data, t):
+        seen.append((topic, data, t))
+    fake_client.deliver(
+        "iot3/lamp1/evt/status/fmt/json", '{"d": {"x": 1}, "t": 42}')
+    assert seen == [("iot3/lamp1/evt/status/fmt/json", {"x": 1}, 42)]
+
+
+def test_t_none_when_envelope_missing_t(app, fake_client):
+    seen = []
+    @app.on("iot3/lamp1/evt/status/fmt/json")
+    def h(data, t):
+        seen.append((data, t))
+    fake_client.deliver("iot3/lamp1/evt/status/fmt/json", '{"d": {"x": 1}}')
+    assert seen == [({"x": 1}, None)]
+
+
+def test_utf8_format_no_unwrap(app, fake_client):
+    seen = []
+    @app.on("iot3/lamp1/evt/status/fmt/utf8")
+    def h(data):
+        seen.append(data)
+    fake_client.deliver("iot3/lamp1/evt/status/fmt/utf8", "hello")
+    assert seen == ["hello"]
