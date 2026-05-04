@@ -36,6 +36,28 @@ def _compile(pattern: str) -> re.Pattern:
     return re.compile("^" + "/".join(out) + "$")
 
 
+def _subsumes(broader: str, narrower: str) -> bool:
+    """True if every topic matching `narrower` also matches `broader`."""
+    b = broader.split("/")
+    n = narrower.split("/")
+    bi = ni = 0
+    while bi < len(b) and ni < len(n):
+        bs = b[bi]
+        ns = n[ni]
+        if bs == "#":
+            return True  # remaining n consumed by #
+        if ns == "#":
+            return False  # broader ran out of generality
+        if bs == "+":
+            bi += 1; ni += 1
+            continue
+        if bs == ns:
+            bi += 1; ni += 1
+            continue
+        return False
+    return bi == len(b) and ni == len(n)
+
+
 class Router:
     def __init__(self):
         self._exact: dict[str, list[Entry]] = {}
