@@ -88,17 +88,12 @@ class App:
             log.warning("io7 connect failed rc=%s", rc)
             return
         log.info("io7 connected as %s", self.app_id)
-        # Re-subscribe to all currently-registered patterns
-        for pattern in self._registered_patterns():
-            self._client.subscribe(pattern)
+        # Re-subscribe to all currently-registered patterns.
+        # Use the `client` arg paho passes us (safer if reconnect ever
+        # rebuilds self._client) rather than self._client directly.
+        for pattern in self._router.all_patterns():
+            client.subscribe(pattern)
 
     def _on_message(self, client, userdata, msg):
-        # Filled in next task
+        # Filled in Phase 3b
         pass
-
-    def _registered_patterns(self) -> set[str]:
-        patterns: set[str] = set()
-        patterns.update(self._router._exact.keys())
-        patterns.update(p for _, _, p in self._router._single)
-        patterns.update(p for _, _, p in self._router._multi)
-        return patterns

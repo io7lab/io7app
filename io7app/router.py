@@ -133,6 +133,14 @@ class Router:
                 out.extend(entries)
         return out
 
+    def all_patterns(self) -> set[str]:
+        """Every currently-registered topic pattern across all tiers.
+        Used by App to enumerate MQTT subscriptions on (re)connect."""
+        out: set[str] = set(self._exact.keys())
+        out.update(p for _, _, p in self._single)
+        out.update(p for _, _, p in self._multi)
+        return out
+
     # --- internals ---
 
     def _patterns_for_name(self, name: str) -> list[str]:
