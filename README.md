@@ -11,11 +11,11 @@ You decorate Python functions with the device events they react to and the sched
 ## The io7 platform — where this library fits
 
 ```
-┌──────────┐                  ┌──────────┐                  ┌─────────────────┐
-│  Devices │ ── events ──▶    │  Broker  │ ── events ──▶    │       App       │
+┌──────────┐                  ┌───────────┐                  ┌─────────────────┐
+│  Devices │  ── events ──▶   │  Broker   │  ── events ──▶   │       App       │
 │ (sensors,│                  │(Mosquitto)│                  │  (this library, │
-│actuators)│ ◀── commands ──  │          │ ◀── commands ──  │   one process)  │
-└──────────┘                  └──────────┘                  └─────────────────┘
+│actuators)│ ◀── commands ──  │           │ ◀── commands ──  │   one process)  │
+└──────────┘                  └───────────┘                  └─────────────────┘
    (many)                                                        (one)
 ```
 
