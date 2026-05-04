@@ -186,6 +186,30 @@ def test_t_none_when_envelope_missing_t(app, fake_client):
     assert seen == [({"x": 1}, None)]
 
 
+def test_signature_with_keyword_only_t(app, fake_client):
+    """The spec lists `f(data, *, t=None)` — must work via keyword pass."""
+    seen = []
+    @app.on("iot3/lamp1/evt/status/fmt/json")
+    def h(data, *, t=None):
+        seen.append((data, t))
+    fake_client.deliver(
+        "iot3/lamp1/evt/status/fmt/json", '{"d": {"x": 1}, "t": 7}')
+    assert seen == [({"x": 1}, 7)]
+
+
+def test_handler_isolation_other_handlers_still_run(app, fake_client):
+    """A raising handler must not block other handlers on the same topic."""
+    seen = []
+    @app.on("iot3/lamp1/evt/status/fmt/json")
+    def boom(data):
+        raise RuntimeError("intentional")
+    @app.on("iot3/lamp1/evt/status/fmt/json")
+    def survivor(data):
+        seen.append(data)
+    fake_client.deliver("iot3/lamp1/evt/status/fmt/json", '{"d": {"x": 1}}')
+    assert seen == [{"x": 1}]
+
+
 def test_utf8_format_no_unwrap(app, fake_client):
     seen = []
     @app.on("iot3/lamp1/evt/status/fmt/utf8")
@@ -233,6 +257,22 @@ def test_publish_raw_no_wrap(app, fake_client):
     assert topic == "dashboard/foo"
     import json
     assert json.loads(body) == {"alive": True}  # not wrapped in 'd'
+
+
+def test_send_cmd_utf8_does_not_repr_dict(app, fake_client):
+    """fmt='utf8' must send the raw string, not Python repr of {'d': ...}."""
+    app.send_cmd("printer1", "label", "Hello\nWorld", fmt="utf8")
+    topic, body, _, _ = fake_client.published[0]
+    assert topic == "iot3/printer1/cmd/label/fmt/utf8"
+    assert body == b"Hello\nWorld"
+
+
+def test_send_cmd_raw_bytes_passthrough(app, fake_client):
+    """fmt='bin' (anything not json/utf8) must pass bytes through verbatim."""
+    app.send_cmd("modem1", "tx", b"\x01\x02\x03", fmt="bin")
+    topic, body, _, _ = fake_client.published[0]
+    assert topic == "iot3/modem1/cmd/tx/fmt/bin"
+    assert body == b"\x01\x02\x03"
 
 
 # --- Task 18: @app.inject decorator ---

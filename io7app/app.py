@@ -123,7 +123,7 @@ class App:
             try:
                 self._invoke(entry.handler, topic, args["data"], args["t"])
             except Exception:
-                log.exception("handler %r raised", entry.name)
+                log.exception("handler %r raised on topic %s", entry.name, topic)
 
     def _decode_for_entry(self, topic, raw, entry):
         fmt = entry.fmt
@@ -149,14 +149,15 @@ class App:
         params = list(sig.parameters)
         n = len(params)
         wants_t = "t" in sig.parameters
+        # Pass t as a kwarg so both positional and keyword-only `t` parameters work.
         if n == 1:
             fn(data)
         elif n == 2 and not wants_t:
             fn(topic, data)
         elif n == 2 and wants_t:
-            fn(data, t)
+            fn(data, t=t)
         elif n == 3 and wants_t:
-            fn(topic, data, t)
+            fn(topic, data, t=t)
         else:
             raise TypeError(
                 f"unsupported handler signature for {fn.__name__}: {sig}"
@@ -179,13 +180,14 @@ class App:
     def send_cmd(self, device_id: str, cmd_id: str, data, *,
                  fmt: str = "json", qos: int = 0, retain: bool = False):
         topic = f"iot3/{device_id}/cmd/{cmd_id}/fmt/{fmt}"
-        body = {"d": data}
+        # The {"d": ...} envelope is a JSON convention. For non-json formats
+        # the caller passes the wire payload directly (str for utf8, bytes for raw).
         if fmt == "json":
-            payload = json.dumps(body).encode()
+            payload = json.dumps({"d": data}).encode()
         elif fmt == "utf8":
-            payload = str(body).encode()
+            payload = data.encode() if isinstance(data, str) else bytes(data)
         else:
-            payload = body  # caller's responsibility for non-text fmts
+            payload = data  # caller passes bytes for raw fmts
         self._client.publish(topic, payload, qos=qos, retain=retain)
 
     def publish(self, topic: str, payload, *,
