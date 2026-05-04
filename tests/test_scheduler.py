@@ -51,3 +51,25 @@ def test_at_start_with_no_other_mode_only_fires_once():
     import pytest
     with pytest.raises(ValueError):
         s.schedule("f", lambda p: None, at_start=True)
+
+
+import datetime as dt
+from unittest.mock import patch
+
+
+def test_at_mode_computes_next_fire():
+    s = Scheduler()
+    # We don't actually wait until tomorrow; we test the next-fire computation.
+    next_at = s._next_fire_for_at("23:59", now=dt.datetime(2026, 1, 1, 12, 0))
+    assert next_at == dt.datetime(2026, 1, 1, 23, 59)
+
+    # If the time today already passed, schedule for tomorrow
+    next_at = s._next_fire_for_at("06:00", now=dt.datetime(2026, 1, 1, 12, 0))
+    assert next_at == dt.datetime(2026, 1, 2, 6, 0)
+
+
+def test_at_mode_invalid_format_rejected():
+    import pytest
+    s = Scheduler()
+    with pytest.raises(ValueError):
+        s.schedule("f", lambda p: None, at="not-a-time")
