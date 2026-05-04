@@ -5,7 +5,7 @@ import logging
 import threading
 import time
 from dataclasses import dataclass, field
-from typing import Callable
+from typing import Any, Callable
 
 log = logging.getLogger("io7app")
 
@@ -18,9 +18,10 @@ class _Job:
     cron: str | None = None
     at: str | None = None
     at_start: bool = False
-    payload: dict | None = None
+    payload: Any = None
     thread: threading.Thread | None = None
     stop_event: threading.Event = field(default_factory=threading.Event)
+    wants_t: bool = False  # cached signature inspection
 
 
 class Scheduler:
@@ -41,8 +42,9 @@ class Scheduler:
             self._next_fire_for_cron(cron)  # validates + checks croniter installed
         if name in self._jobs:
             raise ValueError(f"duplicate inject name {name!r}")
+        wants_t = "t" in inspect.signature(fn).parameters
         job = _Job(name=name, fn=fn, every=every, cron=cron, at=at,
-                   at_start=at_start, payload=payload)
+                   at_start=at_start, payload=payload, wants_t=wants_t)
         self._jobs[name] = job
         if self._started:
             self._launch(job)
@@ -57,6 +59,8 @@ class Scheduler:
         return True
 
     def start(self):
+        if self._started:
+            return  # idempotent — guards against double-start during reconnect
         self._started = True
         for job in list(self._jobs.values()):
             self._launch(job)
@@ -107,11 +111,12 @@ class Scheduler:
     @staticmethod
     def _next_fire_for_at(at: str, now: dt.datetime | None = None) -> dt.datetime:
         try:
-            hh, mm = at.split(":")
-            hh, mm = int(hh), int(mm)
-            assert 0 <= hh < 24 and 0 <= mm < 60
-        except (ValueError, AssertionError) as e:
+            hh_s, mm_s = at.split(":")
+            hh, mm = int(hh_s), int(mm_s)
+        except ValueError as e:
             raise ValueError(f"at= must be 'HH:MM', got {at!r}") from e
+        if not (0 <= hh < 24 and 0 <= mm < 60):
+            raise ValueError(f"at= out of range, got {at!r}")
         now = now or dt.datetime.now()
         candidate = now.replace(hour=hh, minute=mm, second=0, microsecond=0)
         if candidate <= now:
@@ -134,10 +139,9 @@ class Scheduler:
 
     def _fire(self, job: _Job):
         try:
-            sig = inspect.signature(job.fn)
-            kwargs = {}
-            if "t" in sig.parameters:
-                kwargs["t"] = time.time()
-            job.fn(job.payload, **kwargs)
+            if job.wants_t:
+                job.fn(job.payload, t=time.time())
+            else:
+                job.fn(job.payload)
         except Exception:
             log.exception("inject %r raised", job.name)

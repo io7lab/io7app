@@ -244,7 +244,7 @@ Modes (mutually exclusive — exactly one of `every`/`cron`/`at` is required):
 - `at="HH:MM"` — fire daily at local time HH:MM.
 - `at_start=True` — orthogonal flag: also fire once on startup, immediately when `app.run()` enters the loop.
 
-`fire()` calls the user fn with the inspected signature (1-arg `fn(payload)` or 2-arg `fn(topic, payload)` where `topic` is `None` for inject calls). Exceptions are logged and swallowed.
+`fire()` calls the user fn with the inspected signature (1-arg `fn(payload)`, or 2-arg `fn(payload, t)` if the handler declares a `t` parameter — inject jobs have no topic, so the topic-form is not supported here). Exceptions are logged and swallowed.
 
 ```python
 class Scheduler:
@@ -281,7 +281,7 @@ broker → paho on_message(topic, raw_bytes)
 
 **Inject:**
 ```
-inject thread wakes → handler(payload) [or handler(None, payload) for 2-arg form]
+inject thread wakes → handler(payload) [or handler(payload, t=...) when handler declares `t`]
                     → handler may call app.send_cmd / app.publish / app.publish_event
 ```
 

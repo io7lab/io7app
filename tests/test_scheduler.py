@@ -1,4 +1,8 @@
+import datetime as dt
 import time
+
+import pytest
+
 from io7app.scheduler import Scheduler
 
 
@@ -48,13 +52,8 @@ def test_at_start_fires_immediately():
 def test_at_start_with_no_other_mode_only_fires_once():
     """at_start alone -- still need a mode; verify at_start without every is rejected."""
     s = Scheduler()
-    import pytest
     with pytest.raises(ValueError):
         s.schedule("f", lambda p: None, at_start=True)
-
-
-import datetime as dt
-from unittest.mock import patch
 
 
 def test_at_mode_computes_next_fire():
@@ -69,13 +68,9 @@ def test_at_mode_computes_next_fire():
 
 
 def test_at_mode_invalid_format_rejected():
-    import pytest
     s = Scheduler()
     with pytest.raises(ValueError):
         s.schedule("f", lambda p: None, at="not-a-time")
-
-
-import pytest
 
 
 def test_cron_mode_validates_at_register():
@@ -93,7 +88,6 @@ def test_cron_mode_fires(monkeypatch):
 
     # We can't wait a real minute. Instead patch _next_fire_for_cron to return
     # a time ~0.05s ahead each call so the loop fires quickly.
-    real = s._next_fire_for_cron
     def fast(_cron):
         return dt.datetime.now() + dt.timedelta(seconds=0.05)
     s._next_fire_for_cron = fast  # type: ignore
@@ -103,6 +97,20 @@ def test_cron_mode_fires(monkeypatch):
     time.sleep(0.25)
     s.stop()
     assert len(calls) >= 3
+
+
+def test_start_is_idempotent():
+    """Double-calling start() must not launch ghost threads (matters for reconnect)."""
+    s = Scheduler()
+    calls = []
+    def f(payload): calls.append(1)
+    s.schedule("f", f, every=0.05)
+    s.start()
+    s.start()  # should be a no-op
+    time.sleep(0.22)
+    s.stop()
+    # If start were not idempotent, we'd see ~2x the fires
+    assert 3 <= len(calls) <= 6
 
 
 def test_inject_with_t_param():
