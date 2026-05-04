@@ -296,3 +296,37 @@ def test_unregister_cancels_inject(app):
     assert "beat" in app._scheduler._jobs
     app.unregister("beat")
     assert "beat" not in app._scheduler._jobs
+
+
+# --- Task 20: run/stop lifecycle ---
+
+def test_run_subscribes_all(app, fake_client):
+    @app.on_event("lamp1", "status")
+    def a(data):
+        pass
+    @app.on_event("thermo1", "status")
+    def b(data):
+        pass
+    app.run(_block=False)
+    assert "iot3/lamp1/evt/status/fmt/json" in fake_client.subscribed
+    assert "iot3/thermo1/evt/status/fmt/json" in fake_client.subscribed
+    app.stop()
+
+
+def test_resubscribes_on_reconnect(app, fake_client):
+    @app.on_event("lamp1", "status")
+    def a(data):
+        pass
+    fake_client.subscribed.clear()
+    # Simulate paho firing on_connect again after a reconnect
+    fake_client.on_connect(fake_client, None, None, 0)
+    assert "iot3/lamp1/evt/status/fmt/json" in fake_client.subscribed
+
+
+def test_stop_cancels_scheduler(app, fake_client):
+    @app.inject(every=0.05)
+    def beat(d): pass
+    app.run(_block=False)
+    app.stop()
+    assert "beat" not in app._scheduler._jobs or \
+           app._scheduler._jobs["beat"].stop_event.is_set()
