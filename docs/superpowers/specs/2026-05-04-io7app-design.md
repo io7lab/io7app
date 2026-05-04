@@ -187,8 +187,9 @@ class Router:
         """Remove every entry where entry.name == name.
         Returns the set of patterns that became empty (caller must MQTT-unsubscribe)."""
 
-    def dispatch(self, topic: str, raw_payload: bytes) -> list[Entry]:
-        """Return all handlers matching topic, in registration order."""
+    def dispatch(self, topic: str) -> list[Entry]:
+        """Return all matching entries, in registration order. Decoding the
+        payload is the App's job, not the router's — single responsibility."""
 ```
 
 Pattern → regex compilation (only when wildcards present):

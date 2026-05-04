@@ -87,7 +87,6 @@ class Router:
                 return False
 
         # Detect "existing is subsumed by new" -- replace
-        replaced_any = False
         for ep in list(existing):
             if _subsumes(pattern, ep) and ep != pattern:
                 log.warning(
@@ -95,7 +94,6 @@ class Router:
                     name, pattern, ep,
                 )
                 self._remove_entry_for_name(ep, name)
-                replaced_any = True
 
         # Pure-overlap warning (no subsumption either way, but plausibly overlap)
         for ep in self._patterns_for_name(name):
@@ -200,8 +198,15 @@ class Router:
 
     @staticmethod
     def _may_overlap(a: str, b: str) -> bool:
-        """Heuristic: returns False if patterns are provably disjoint by a literal mismatch.
-        Both must contain wildcards to be considered overlapping."""
+        """v1 overlap heuristic — returns False if patterns are provably disjoint
+        by a literal mismatch in any aligned segment, True otherwise. Both patterns
+        must contain wildcards.
+
+        Known limitation: when patterns have different segment counts and `zip`
+        exhausts before any mismatch, this returns True even when the patterns are
+        actually disjoint (e.g. `a/+` vs `a/+/c`). The spec calls full intersection
+        detection out of scope for v1; a spurious overlap warning is acceptable.
+        """
         if not (("+" in a or "#" in a) and ("+" in b or "#" in b)):
             return False
         ap = a.split("/")
