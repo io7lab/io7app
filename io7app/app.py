@@ -171,3 +171,19 @@ class App:
             s = inspect.signature(fn)
             cache[fn] = s
         return s
+
+    def on_event(self, device_id: str, event_id: str, fmt: str = "json"):
+        topic = f"iot3/{device_id}/evt/{event_id}/fmt/{fmt}"
+        return self.on(topic)
+
+    def send_cmd(self, device_id: str, cmd_id: str, data, *,
+                 fmt: str = "json", qos: int = 0, retain: bool = False):
+        topic = f"iot3/{device_id}/cmd/{cmd_id}/fmt/{fmt}"
+        body = {"d": data}
+        if fmt == "json":
+            payload = json.dumps(body).encode()
+        elif fmt == "utf8":
+            payload = str(body).encode()
+        else:
+            payload = body  # caller's responsibility for non-text fmts
+        self._client.publish(topic, payload, qos=qos, retain=retain)

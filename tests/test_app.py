@@ -193,3 +193,32 @@ def test_utf8_format_no_unwrap(app, fake_client):
         seen.append(data)
     fake_client.deliver("iot3/lamp1/evt/status/fmt/utf8", "hello")
     assert seen == ["hello"]
+
+
+# --- Task 16: on_event sugar + send_cmd ---
+
+def test_on_event_topic_built(app, fake_client):
+    @app.on_event("thermo1", "status")
+    def h(data):
+        pass
+    assert "iot3/thermo1/evt/status/fmt/json" in fake_client.subscribed
+
+
+def test_on_event_with_wildcards(app, fake_client):
+    @app.on_event("+", "status")
+    def h(topic, data):
+        pass
+    assert "iot3/+/evt/status/fmt/json" in fake_client.subscribed
+
+
+def test_switch_lamp_round_trip(app, fake_client):
+    @app.on_event("switch1", "status")
+    def on_switch(data):
+        app.send_cmd("lamp1", "lamp", {"lamp": data["switch"]})
+    fake_client.deliver("iot3/switch1/evt/status/fmt/json",
+                        '{"d": {"switch": "on"}}')
+    assert fake_client.published, "no command published"
+    topic, body, qos, retain = fake_client.published[0]
+    assert topic == "iot3/lamp1/cmd/lamp/fmt/json"
+    import json
+    assert json.loads(body) == {"d": {"lamp": "on"}}
