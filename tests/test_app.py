@@ -233,3 +233,23 @@ def test_publish_raw_no_wrap(app, fake_client):
     assert topic == "dashboard/foo"
     import json
     assert json.loads(body) == {"alive": True}  # not wrapped in 'd'
+
+
+# --- Task 18: @app.inject decorator ---
+
+def test_inject_registers_with_scheduler(app):
+    @app.inject(every=0.05, payload={"k": 1})
+    def heartbeat(data):
+        pass
+    # Job is registered; scheduler not started yet (run() does that)
+    assert "heartbeat" in app._scheduler._jobs
+    job = app._scheduler._jobs["heartbeat"]
+    assert job.every == 0.05
+    assert job.payload == {"k": 1}
+
+
+def test_inject_validates_modes(app):
+    import pytest
+    with pytest.raises(ValueError):
+        @app.inject()  # no mode
+        def bad(d): pass

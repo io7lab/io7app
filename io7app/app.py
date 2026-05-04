@@ -197,3 +197,14 @@ class App:
         else:
             body = payload  # bytes
         self._client.publish(topic, body, qos=qos, retain=retain)
+
+    def inject(self, *, every=None, cron=None, at=None,
+               at_start=False, payload=None):
+        def decorator(fn):
+            self._scheduler.schedule(
+                fn.__name__, fn,
+                every=every, cron=cron, at=at,
+                at_start=at_start, payload=payload,
+            )
+            return fn
+        return decorator
