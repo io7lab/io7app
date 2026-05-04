@@ -95,11 +95,11 @@ class App:
 
     def _on_connect(self, client, userdata, flags, reason_code, properties=None):
         # paho v2 callback (5 args incl. properties); v1 (4 args incl. rc)
-        # also dispatches here -- properties defaults to None for v1 compat.
-        # `reason_code` is `rc` (int) on v1, ReasonCode object on v2 (truthy if non-success).
-        rc = int(reason_code) if reason_code is not None else 0
-        if rc != 0:
-            log.warning("io7 connect failed rc=%s", rc)
+        # both dispatch here. v1 reason_code is an int rc; v2 is a ReasonCode
+        # object exposing .is_failure and string formatting.
+        failed = getattr(reason_code, "is_failure", reason_code != 0)
+        if failed:
+            log.warning("io7 connect failed: %s", reason_code)
             return
         log.info("io7 connected as %s", self.app_id)
         # Re-subscribe to all currently-registered patterns.
