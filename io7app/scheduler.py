@@ -1,5 +1,6 @@
 """Inject scheduler: one daemon thread per scheduled job."""
 import datetime as dt
+import inspect
 import logging
 import threading
 import time
@@ -133,6 +134,10 @@ class Scheduler:
 
     def _fire(self, job: _Job):
         try:
-            job.fn(job.payload)
+            sig = inspect.signature(job.fn)
+            kwargs = {}
+            if "t" in sig.parameters:
+                kwargs["t"] = time.time()
+            job.fn(job.payload, **kwargs)
         except Exception:
             log.exception("inject %r raised", job.name)

@@ -103,3 +103,18 @@ def test_cron_mode_fires(monkeypatch):
     time.sleep(0.25)
     s.stop()
     assert len(calls) >= 3
+
+
+def test_inject_with_t_param():
+    s = Scheduler()
+    seen = []
+    def f(payload, t):
+        seen.append((payload, t))
+    s.schedule("f", f, every=0.05, payload={"k": 1})
+    s.start()
+    time.sleep(0.12)
+    s.stop()
+    assert seen
+    payload, t = seen[0]
+    assert payload == {"k": 1}
+    assert isinstance(t, float) and t > 0
