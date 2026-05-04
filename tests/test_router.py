@@ -17,3 +17,16 @@ def test_exact_no_match():
     r = Router()
     r.add("iot3/lamp1/evt/status/fmt/json", lambda t, p: None, "h")
     assert r.dispatch("iot3/other/evt/status/fmt/json") == []
+
+
+def test_single_wildcard_plus():
+    r = Router()
+    seen = []
+    def h(topic, payload): seen.append(topic)
+    r.add("iot3/+/evt/+/fmt/json", h, "h")
+    assert len(r.dispatch("iot3/lamp1/evt/status/fmt/json")) == 1
+    assert len(r.dispatch("iot3/thermo1/evt/temperature/fmt/json")) == 1
+    # Wrong fmt -- no match
+    assert r.dispatch("iot3/lamp1/evt/status/fmt/utf8") == []
+    # Too few segments
+    assert r.dispatch("iot3/lamp1/evt/status") == []
