@@ -167,8 +167,12 @@ class App:
         raw = msg.payload
         entries = self._router.dispatch(topic)
         if log.isEnabledFor(logging.DEBUG):
-            handlers = ", ".join(e.name for e in entries) or "(no handler)"
-            log.debug("recv %s %s -> %s", topic, _preview(raw), handlers)
+            preview = _preview(raw)
+            if entries:
+                calls = ", ".join(f"{e.name}({preview})" for e in entries)
+                log.debug("recv %s %s", topic, calls)
+            else:
+                log.debug("recv %s %s (no handler)", topic, preview)
         if not entries:
             return
         for entry in entries:
