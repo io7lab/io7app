@@ -253,3 +253,46 @@ def test_inject_validates_modes(app):
     with pytest.raises(ValueError):
         @app.inject()  # no mode
         def bad(d): pass
+
+
+# --- Task 19: unregister ---
+
+def test_unregister_removes_handler(app, fake_client):
+    seen = []
+    @app.on_event("lamp1", "status")
+    def h(data):
+        seen.append(data)
+    fake_client.deliver("iot3/lamp1/evt/status/fmt/json", '{"d": {"x": 1}}')
+    assert seen == [{"x": 1}]
+    app.unregister("h")
+    fake_client.deliver("iot3/lamp1/evt/status/fmt/json", '{"d": {"x": 2}}')
+    assert seen == [{"x": 1}]  # no further calls
+
+
+def test_unregister_unsubscribes_when_pattern_empty(app, fake_client):
+    @app.on_event("lamp1", "status")
+    def h(data):
+        pass
+    assert "iot3/lamp1/evt/status/fmt/json" in fake_client.subscribed
+    app.unregister("h")
+    assert "iot3/lamp1/evt/status/fmt/json" in fake_client.unsubscribed
+
+
+def test_unregister_keeps_pattern_alive_if_other_handlers(app, fake_client):
+    @app.on_event("lamp1", "status")
+    def a(data):
+        pass
+    @app.on_event("lamp1", "status")
+    def b(data):
+        pass
+    app.unregister("a")
+    assert "iot3/lamp1/evt/status/fmt/json" not in fake_client.unsubscribed
+
+
+def test_unregister_cancels_inject(app):
+    @app.inject(every=0.05)
+    def beat(data):
+        pass
+    assert "beat" in app._scheduler._jobs
+    app.unregister("beat")
+    assert "beat" not in app._scheduler._jobs

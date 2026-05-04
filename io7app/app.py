@@ -208,3 +208,11 @@ class App:
             )
             return fn
         return decorator
+
+    def unregister(self, name: str) -> None:
+        emptied = self._router.remove_by_name(name)
+        if self._client is not None:
+            for pattern in emptied:
+                self._client.unsubscribe(pattern)
+        # Cancel any inject by this name
+        self._scheduler.cancel(name)
