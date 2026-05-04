@@ -26,7 +26,7 @@ IO7_TOKEN=app3
 
 TLS is auto-detected: if `IO7_CA` is set, or if a file named `ca.pem` exists in the working directory, the connection upgrades to TLS on port 8883. Same convention as `io7lab/IO7FuPython`.
 
-Tested by: `test_app.py::test_env_loaded`, `test_app.py::test_tls_auto_detect`.
+Tested by: `test_app.py::test_env_loaded`, `test_app.py::test_tls_auto_detect_from_kwarg`, `::test_tls_auto_detect_from_env`, `::test_tls_auto_detect_from_capem_in_cwd`, `::test_no_tls_default_port_1883`.
 
 ---
 
@@ -80,7 +80,7 @@ Subscribes to `iot3/thermo1/evt/status/fmt/json`. Wildcards work too:
 @app.on_event("thermo1", "+")       # any event from thermo1
 ```
 
-Tested by: `test_app.py::test_on_event_topic_built`, `test_router.py::test_wildcards`.
+Tested by: `test_app.py::test_on_event_topic_built`, `::test_on_event_with_wildcards`, `test_router.py::test_single_wildcard_plus`, `::test_multi_wildcard_hash`, `::test_hash_with_plus_combined`.
 
 ### 3.2 `@app.on(pattern)` — raw topic for full power
 
@@ -92,7 +92,7 @@ def trace(topic, data):
     print(topic, data)
 ```
 
-Tested by: `test_app.py::test_on_raw_pattern`.
+Tested by: `test_app.py::test_on_decorator_registers_and_subscribes`, `::test_signature_two_args_topic_data`.
 
 ### 3.3 Handler signatures
 
@@ -115,7 +115,7 @@ def log(data, t):
 
 `t` is whatever the device sent (epoch ms or ISO string — pass-through, no parsing). `None` if the envelope had no `t`.
 
-Tested by: `test_app.py::test_signature_one_arg`, `::test_signature_two_args`, `::test_signature_with_t`, `::test_signature_with_topic_and_t`.
+Tested by: `test_app.py::test_signature_one_arg`, `::test_signature_two_args_topic_data`, `::test_signature_with_t`, `::test_signature_with_topic_and_t`, `::test_signature_with_keyword_only_t`, `::test_t_none_when_envelope_missing_t`.
 
 ### 3.4 The `d` envelope contract (PRD #7)
 
@@ -136,7 +136,7 @@ For non-JSON formats:
 - `/fmt/utf8` → `data` is the decoded string; `t` is always `None`; no `d` requirement.
 - Any other format → `data` is raw `bytes`.
 
-Tested by: `test_app.py::test_unwraps_d`, `::test_drops_when_no_d`, `::test_drops_when_not_dict`, `::test_utf8_format`.
+Tested by: `test_app.py::test_unwraps_d`, `::test_drops_when_no_d`, `::test_drops_when_not_dict`, `::test_drops_malformed_json`, `::test_utf8_format_no_unwrap`.
 
 ---
 
@@ -149,7 +149,7 @@ app.send_cmd("lamp1", "lamp", {"lamp": "on"})
 
 `send_cmd(device_id, cmd_id, data)` auto-wraps: you pass the meaningful data, the framework adds the `"d":` envelope. Optional kwargs: `fmt="json"`, `qos=0`, `retain=False`.
 
-Tested by: `test_app.py::test_send_cmd_topic_and_envelope`.
+Tested by: `test_app.py::test_switch_lamp_round_trip`, `::test_send_cmd_utf8_does_not_repr_dict`, `::test_send_cmd_raw_bytes_passthrough`.
 
 ### Raw publish (escape hatch)
 
@@ -194,7 +194,7 @@ Optional: `payload=<dict>` becomes the `data` argument to your handler. `None` i
 
 Inject handlers also get `t` (the wall-clock fire time as `time.time()` float) if they declare it.
 
-Tested by: `test_scheduler.py::test_every_fires_repeatedly`, `::test_at_start_fires_immediately`, `::test_cron_mode`, `::test_at_mode`, `::test_payload_passed`, `::test_inject_with_t`.
+Tested by: `test_scheduler.py::test_every_fires_repeatedly`, `::test_at_start_fires_immediately`, `::test_at_mode_computes_next_fire`, `::test_at_mode_invalid_format_rejected`, `::test_cron_mode_fires`, `::test_cron_mode_validates_at_register`, `::test_inject_with_t_param`.
 
 ---
 
@@ -217,7 +217,7 @@ app.unregister("trace")
 
 If a topic pattern has no remaining handlers, the framework calls `client.unsubscribe(pattern)` so the broker stops sending those messages — saves bandwidth.
 
-Tested by: `test_app.py::test_unregister_removes_handler`, `::test_unregister_unsubscribes_when_empty`, `::test_unregister_cancels_inject`.
+Tested by: `test_app.py::test_unregister_removes_handler`, `::test_unregister_unsubscribes_when_pattern_empty`, `::test_unregister_keeps_pattern_alive_if_other_handlers`, `::test_unregister_cancels_inject`.
 
 ---
 

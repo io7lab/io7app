@@ -19,7 +19,12 @@ class _DropMessage(Exception):
 
 
 def _build_mqtt_client(app_id: str, token: str, ca: str | None) -> mqtt.Client:
-    client = mqtt.Client(client_id=app_id, clean_session=True)
+    # paho 2.x prefers VERSION2 callbacks (V1 is deprecated).
+    # paho 1.x has no CallbackAPIVersion at all.
+    api_kw = {}
+    if hasattr(mqtt, "CallbackAPIVersion"):
+        api_kw["callback_api_version"] = mqtt.CallbackAPIVersion.VERSION2
+    client = mqtt.Client(client_id=app_id, clean_session=True, **api_kw)
     if ca:
         client.tls_set(ca_certs=ca)
     return client
@@ -88,7 +93,11 @@ class App:
         self._client.on_connect = self._on_connect
         self._client.on_message = self._on_message
 
-    def _on_connect(self, client, userdata, flags, rc):
+    def _on_connect(self, client, userdata, flags, reason_code, properties=None):
+        # paho v2 callback (5 args incl. properties); v1 (4 args incl. rc)
+        # also dispatches here -- properties defaults to None for v1 compat.
+        # `reason_code` is `rc` (int) on v1, ReasonCode object on v2 (truthy if non-success).
+        rc = int(reason_code) if reason_code is not None else 0
         if rc != 0:
             log.warning("io7 connect failed rc=%s", rc)
             return

@@ -33,7 +33,8 @@ class FakeMQTTClient:
         self.port = port
         self.connected = True
         if self.on_connect:
-            self.on_connect(self, None, None, 0)
+            # paho v2 callback shape: (client, userdata, flags, reason_code, properties)
+            self.on_connect(self, None, None, 0, None)
 
     def disconnect(self):
         self.connected = False
