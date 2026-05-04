@@ -1,5 +1,9 @@
 # io7app
 
+[![PyPI](https://img.shields.io/pypi/v/io7app.svg)](https://pypi.org/project/io7app/)
+[![Python](https://img.shields.io/pypi/pyversions/io7app.svg)](https://pypi.org/project/io7app/)
+[![License](https://img.shields.io/pypi/l/io7app.svg)](LICENSE)
+
 A small, intuitive Python framework for writing **app servers** on the [io7 IoT platform](https://github.com/io7lab/).
 
 You decorate Python functions with the device events they react to and the schedules they fire on. The framework owns the MQTT connection, topic routing, JSON envelope handling, scheduling, and dynamic register/unregister. Your code stays focused on business logic.
@@ -21,10 +25,12 @@ This library implements **only the App side**. Device firmware lives in the io7 
 
 ## Install
 
+Available on [PyPI](https://pypi.org/project/io7app/) — `pip` pulls from there by default:
+
 ```bash
 pip install io7app
 # Optional, only if you use @inject(cron=...)
-pip install croniter
+pip install io7app[cron]
 ```
 
 Requires Python ≥ 3.10. Talks to any standard MQTT broker (Mosquitto, EMQX, HiveMQ, the io7 platform itself).
