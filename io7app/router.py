@@ -13,8 +13,14 @@ def _fmt_of(pattern: str) -> str | None:
     return None
 
 
-def _has_wildcard(pattern: str) -> bool:
-    return "+" in pattern.split("/") or pattern.split("/")[-1] == "#"
+def _wildcard_kind(pattern: str) -> str:
+    """Returns 'exact', 'single', or 'multi'."""
+    parts = pattern.split("/")
+    if parts[-1] == "#":
+        return "multi"
+    if "+" in parts:
+        return "single"
+    return "exact"
 
 
 def _compile(pattern: str) -> re.Pattern:
@@ -34,25 +40,30 @@ class Router:
     def __init__(self):
         self._exact: dict[str, list[Entry]] = {}
         self._single: list[tuple[re.Pattern, list[Entry], str]] = []
+        self._multi: list[tuple[re.Pattern, list[Entry], str]] = []
 
     def add(self, pattern: str, handler: Callable, name: str) -> bool:
         entry = Entry(handler, name, pattern, _fmt_of(pattern))
-        if not _has_wildcard(pattern):
+        kind = _wildcard_kind(pattern)
+        if kind == "exact":
             is_new = pattern not in self._exact
             self._exact.setdefault(pattern, []).append(entry)
             return is_new
-        # has + (we'll handle # in next task)
-        for rgx, entries, pat in self._single:
+        bucket = self._single if kind == "single" else self._multi
+        for _, entries, pat in bucket:
             if pat == pattern:
                 entries.append(entry)
                 return False
-        self._single.append((_compile(pattern), [entry], pattern))
+        bucket.append((_compile(pattern), [entry], pattern))
         return True
 
     def dispatch(self, topic: str) -> list[Entry]:
         out: list[Entry] = []
         out.extend(self._exact.get(topic, []))
         for rgx, entries, _ in self._single:
+            if rgx.match(topic):
+                out.extend(entries)
+        for rgx, entries, _ in self._multi:
             if rgx.match(topic):
                 out.extend(entries)
         return out
