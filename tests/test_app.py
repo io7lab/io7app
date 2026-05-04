@@ -222,3 +222,14 @@ def test_switch_lamp_round_trip(app, fake_client):
     assert topic == "iot3/lamp1/cmd/lamp/fmt/json"
     import json
     assert json.loads(body) == {"d": {"lamp": "on"}}
+
+
+# --- Task 17: publish raw escape hatch ---
+
+def test_publish_raw_no_wrap(app, fake_client):
+    app.publish("dashboard/foo", {"alive": True})
+    assert fake_client.published
+    topic, body, _, _ = fake_client.published[0]
+    assert topic == "dashboard/foo"
+    import json
+    assert json.loads(body) == {"alive": True}  # not wrapped in 'd'

@@ -187,3 +187,13 @@ class App:
         else:
             payload = body  # caller's responsibility for non-text fmts
         self._client.publish(topic, payload, qos=qos, retain=retain)
+
+    def publish(self, topic: str, payload, *,
+                fmt: str = "json", qos: int = 0, retain: bool = False):
+        if fmt == "json":
+            body = json.dumps(payload).encode()
+        elif fmt == "utf8":
+            body = payload.encode() if isinstance(payload, str) else bytes(payload)
+        else:
+            body = payload  # bytes
+        self._client.publish(topic, body, qos=qos, retain=retain)
