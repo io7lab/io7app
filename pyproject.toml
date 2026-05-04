@@ -2,13 +2,36 @@
 name = "io7app"
 version = "0.1.0"
 description = "Python app-server framework for the io7 IoT platform"
+readme = "README.md"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
 authors = [{ name = "Yoonseok Hur" }]
+keywords = ["iot", "mqtt", "io7", "automation"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Communications",
+  "Topic :: Home Automation",
+  "Topic :: Software Development :: Libraries :: Application Frameworks",
+]
 dependencies = [
   "paho-mqtt>=1.6,<3.0",
   "python-dotenv>=1.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/io7lab/io7app"
+Documentation = "https://github.com/io7lab/io7app/blob/main/USER_GUIDE.md"
+Source = "https://github.com/io7lab/io7app"
+Issues = "https://github.com/io7lab/io7app/issues"
 
 [project.optional-dependencies]
 cron = ["croniter>=2.0"]
