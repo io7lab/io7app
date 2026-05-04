@@ -248,7 +248,7 @@ class App:
             payload = data.encode() if isinstance(data, str) else bytes(data)
         else:
             payload = data  # caller passes bytes for raw fmts
-        log.debug("send_cmd %s %s", topic, _preview(payload))
+        log.debug("send_cmd %s -> %s", _preview(payload), topic)
         self._client.publish(topic, payload, qos=qos, retain=retain)
 
     def publish(self, topic: str, payload, *,
