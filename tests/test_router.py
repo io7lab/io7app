@@ -147,3 +147,37 @@ def test_consolidation_only_within_same_name(caplog):
     assert caplog.records == []
     matches = r.dispatch("iot3/lamp1/evt/status/fmt/json")
     assert len(matches) == 2
+
+
+def test_remove_by_name_returns_emptied_patterns():
+    r = Router()
+    def a(t, p): pass
+    def b(t, p): pass
+    r.add("iot3/lamp1/evt/status/fmt/json", a, "a")
+    r.add("iot3/lamp1/evt/status/fmt/json", b, "b")
+    r.add("iot3/+/evt/+/fmt/json", a, "a")
+    emptied = r.remove_by_name("a")
+    # The +-pattern was a-only; the exact pattern still has b
+    assert emptied == {"iot3/+/evt/+/fmt/json"}
+    assert len(r.dispatch("iot3/lamp1/evt/status/fmt/json")) == 1
+
+
+def test_remove_by_name_unknown_returns_empty_set():
+    r = Router()
+    assert r.remove_by_name("nope") == set()
+
+
+def test_remove_by_name_removes_all_tiers():
+    r = Router()
+    def f(t, p): pass
+    r.add("iot3/lamp1/evt/status/fmt/json", f, "f")
+    r.add("iot3/+/evt/+/fmt/json", f, "f")
+    # different name to keep these patterns alive
+    def g(t, p): pass
+    r.add("iot3/+/cmd/#", g, "g")
+    emptied = r.remove_by_name("f")
+    # Both f patterns drop. (Note: '+' subsumed exact at registration so only one f-pattern remains.)
+    assert "iot3/+/evt/+/fmt/json" in emptied
+    # g still works
+    assert len(r.dispatch("iot3/lamp1/cmd/lamp/fmt/json")) == 1
+    assert r.dispatch("iot3/lamp1/evt/status/fmt/json") == []

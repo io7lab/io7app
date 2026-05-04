@@ -166,6 +166,38 @@ class Router:
                         bucket[i] = (rgx, new_entries, p)
                     return
 
+    def remove_by_name(self, name: str) -> set[str]:
+        """Remove every entry where entry.name == name across all tiers.
+        Returns the set of patterns that have no remaining handlers
+        (caller should MQTT-unsubscribe each).
+        """
+        emptied: set[str] = set()
+
+        # Exact tier
+        for p in list(self._exact.keys()):
+            new_entries = [e for e in self._exact[p] if e.name != name]
+            if not new_entries:
+                del self._exact[p]
+                emptied.add(p)
+            else:
+                self._exact[p] = new_entries
+
+        # Single & multi tiers
+        for bucket in (self._single, self._multi):
+            i = 0
+            while i < len(bucket):
+                rgx, entries, p = bucket[i]
+                new_entries = [e for e in entries if e.name != name]
+                if not new_entries:
+                    bucket.pop(i)
+                    emptied.add(p)
+                    continue
+                if len(new_entries) != len(entries):
+                    bucket[i] = (rgx, new_entries, p)
+                i += 1
+
+        return emptied
+
     @staticmethod
     def _may_overlap(a: str, b: str) -> bool:
         """Heuristic: returns False if patterns are provably disjoint by a literal mismatch.
