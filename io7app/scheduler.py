@@ -138,7 +138,7 @@ class Scheduler:
         return croniter(cron, now).get_next(dt.datetime)
 
     def _fire(self, job: _Job):
-        log.debug("inject %r fire", job.name)
+        log.debug("inject %r fire payload=%r", job.name, job.payload)
         try:
             if job.wants_t:
                 job.fn(job.payload, t=time.time())

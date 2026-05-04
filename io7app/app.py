@@ -19,6 +19,19 @@ class _DropMessage(Exception):
 
 
 _VALID_LOG_LEVELS = ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
+_PREVIEW_MAX = 200
+
+
+def _preview(payload, max_len: int = _PREVIEW_MAX) -> str:
+    """Format a wire payload for log output: utf-8 decode if possible,
+    truncated to max_len, otherwise a bytes-repr. Never raises."""
+    try:
+        s = payload.decode("utf-8") if isinstance(payload, (bytes, bytearray)) else str(payload)
+    except UnicodeDecodeError:
+        s = repr(bytes(payload))
+    if len(s) > max_len:
+        s = s[:max_len] + "...(truncated)"
+    return s
 
 
 def _configure_logger(level_name: str) -> None:
@@ -153,7 +166,9 @@ class App:
         topic = msg.topic
         raw = msg.payload
         entries = self._router.dispatch(topic)
-        log.debug("recv %s (%d bytes) -> %d handler(s)", topic, len(raw), len(entries))
+        if log.isEnabledFor(logging.DEBUG):
+            handlers = ", ".join(e.name for e in entries) or "(no handler)"
+            log.debug("recv %s %s -> %s", topic, _preview(raw), handlers)
         if not entries:
             return
         for entry in entries:
@@ -229,7 +244,7 @@ class App:
             payload = data.encode() if isinstance(data, str) else bytes(data)
         else:
             payload = data  # caller passes bytes for raw fmts
-        log.debug("send_cmd %s (%d bytes)", topic, len(payload))
+        log.debug("send_cmd %s %s", topic, _preview(payload))
         self._client.publish(topic, payload, qos=qos, retain=retain)
 
     def publish(self, topic: str, payload, *,
