@@ -3,6 +3,8 @@ name = "io7app"
 version = "0.1.0"
 description = "Python app-server framework for the io7 IoT platform"
 requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [{ name = "Yoonseok Hur" }]
 dependencies = [
   "paho-mqtt>=1.6,<3.0",
   "python-dotenv>=1.0",

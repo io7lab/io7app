@@ -74,4 +74,4 @@ pytest
 
 ## License
 
-TBD — no LICENSE file yet. Add one before publishing to PyPI.
+MIT — see [LICENSE](LICENSE). Same as the rest of the io7lab packages.
