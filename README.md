@@ -144,6 +144,8 @@ Then `docker compose up -d io7-app`. Compose places the service on the project's
 - **[examples/](examples/)** — five runnable apps: switch/lamp, thermostat/valve, lux auto-lamp, scheduled inject, wildcard tracing.
 - **[docs/superpowers/specs/](docs/superpowers/specs/)** — design document.
 - **[docs/superpowers/plans/](docs/superpowers/plans/)** — implementation plan.
+- How to use demo youtube : https://youtu.be/nGQX1Ks-418
+  
 
 ## Develop
 
