@@ -273,6 +273,42 @@ Rules applied per handler name:
 | Pure overlap (neither subsumes) | keep both, WARN — handler may fire twice for those topics |
 | Disjoint | keep both, no log |
 
+What this looks like in practice — three shapes you'll write often:
+
+**1. Same handler, overlapping patterns → converged**
+
+```python
+@app.on("sw1")
+@app.on("+")
+def f1(...): ...
+```
+
+→ broader `+` wins, `sw1` is dropped. One subscription on `+`. WARN logged.
+
+**2. Different handlers, same pattern → merged**
+
+```python
+@app.on("sw1/status")
+def f2(...): ...
+
+@app.on("sw1/status")
+def f3(...): ...
+```
+
+→ one subscription on `sw1/status`; both fire per message (in registration order). `unregister("f2")` drops only `f2`; the subscription stays until `f3` is also removed.
+
+**3. Different handlers, different patterns → intact**
+
+```python
+@app.on("+")
+def f4(...): ...
+
+@app.on("sw1")
+def f5(...): ...
+```
+
+→ both kept independently. Topic `sw1` fires both; `sw2` fires only `f4`. No consolidation across handler names.
+
 Tested by: `test_router.py::test_consolidation_exact_dup`, `::test_consolidation_subsumed`, `::test_consolidation_replace_narrower`, `::test_consolidation_pure_overlap_warns`.
 
 ---
