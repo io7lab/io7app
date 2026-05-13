@@ -8,7 +8,7 @@ A small, intuitive Python framework for writing **app servers** on the [io7 IoT 
 
 You decorate Python functions with the device events they react to and the schedules they fire on. The framework owns the MQTT connection, topic routing, JSON envelope handling, scheduling, and dynamic register/unregister. Your code stays focused on business logic.
 
-- How to use demo youtube : https://youtu.be/nGQX1Ks-418
+**Demo:** [YouTube walkthrough](https://youtu.be/nGQX1Ks-418)
 
 ## The io7 platform — where this library fits
 
@@ -76,11 +76,11 @@ Useful when you don't want to manage a Python environment on the host, and the n
 
 **1. Find the network your io7 stack is on.**
 
-So this app can talk to the broker / `io7api` by container name instead of via the public internet:
+So the app can reach the broker / `io7api` by container name rather than over the public internet:
 
 ```bash
 docker network ls
-# or, looked up off a known container:
+# or look it up from a known container:
 docker inspect io7api \
   --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}} {{end}}'
 ```
@@ -97,7 +97,7 @@ docker run -d --restart always \
   io7lab/io7-app
 ```
 
-When the broker runs on the same docker network, `.env` should target the broker's service/container name rather than its public DNS:
+When the broker runs on the same docker network, point `IO7_SERVER` in `.env` at the broker's service/container name rather than its public DNS:
 
 ```
 IO7_SERVER=mqtt        # or whatever your broker container is named
@@ -105,9 +105,9 @@ IO7_APP_ID=app3
 IO7_TOKEN=app3
 ```
 
-The container watches `/app/app.py` and `/app/.env` and **auto-restarts** the python process when either changes — edit a file, save, and the new code is live within ~2 seconds. No need to bounce the container yourself. If you split your app across helper modules, run `touch app.py` to force a reload after editing them.
+The container watches `/app/app.py` and `/app/.env` and **auto-restarts** the Python process when either changes — edit a file, save, and the new code is live within ~2 seconds. No need to bounce the container yourself. If you split your app across helper modules, run `touch app.py` to force a reload after editing them.
 
-If `app.py` raises an exception, the traceback shows up in `docker logs -f io7-app` and the container keeps watching; fix the file and it restarts automatically.
+If `app.py` raises an exception, the traceback shows up in `docker logs -f io7app` and the container keeps watching; fix the file and it restarts automatically.
 
 Tunables (set with `-e`):
 
@@ -136,9 +136,9 @@ Then `docker compose up -d io7-app`. Compose places the service on the project's
 ## Status
 
 - Version 0.1.0
-- ~640 lines of Python across three small modules (router, scheduler, app)
+- Under 700 lines of Python across three small modules (router, scheduler, app)
 - 71 tests, all green
-- One dependency: `paho-mqtt`. Plus `python-dotenv` for config and optionally `croniter` for cron schedules.
+- Runtime deps: `paho-mqtt` (MQTT) and `python-dotenv` (config). Optional: `croniter` for cron schedules.
 
 ## Where to go next
 
@@ -146,7 +146,6 @@ Then `docker compose up -d io7-app`. Compose places the service on the project's
 - **[examples/](examples/)** — five runnable apps: switch/lamp, thermostat/valve, lux auto-lamp, scheduled inject, wildcard tracing.
 - **[docs/superpowers/specs/](docs/superpowers/specs/)** — design document.
 - **[docs/superpowers/plans/](docs/superpowers/plans/)** — implementation plan.
-  
 
 ## Develop
 
