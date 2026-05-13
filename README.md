@@ -18,7 +18,7 @@ You decorate Python functions with the device events they react to and the sched
 │ (sensors,│                  │(Mosquitto)│                  │  (this library, │
 │actuators)│ ◀── commands ──  │           │ ◀── commands ──  │   one process)  │
 └──────────┘                  └───────────┘                  └─────────────────┘
-   (many)                                                        (one)
+   (many)                                                        
 ```
 
 io7 separates the world into two roles. **Devices** publish *events* (sensor readings, status changes) and receive *commands* (actuation requests). **Apps** subscribe to events from any device and publish commands to any device — they are where the IoT business logic lives ("if temperature drops, turn the valve on", "when the switch flips, mirror it on the lamp").
