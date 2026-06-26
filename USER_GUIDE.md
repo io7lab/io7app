@@ -22,10 +22,13 @@ IO7_APP_ID=app3
 IO7_TOKEN=app3
 # IO7_PORT=1883      # optional, default 1883 (or 8883 with TLS)
 # IO7_CA=ca.pem      # optional, enables TLS on 8883
+# IO7_IGNORE_TLS_VERIFY=0  # optional, 1/true/yes skips cert verification (default off)
 # IO7_LOG=ERROR      # DEBUG | INFO | WARNING | ERROR | CRITICAL (default ERROR)
 ```
 
 TLS is auto-detected: if `IO7_CA` is set, or if a file named `ca.pem` exists in the working directory, the connection upgrades to TLS on port 8883. Same convention as `io7lab/IO7FuPython`.
+
+**Skipping certificate verification.** Set `IO7_IGNORE_TLS_VERIFY=1` (also accepts `true`/`yes`, case-insensitive) to keep TLS encryption on port 8883 but skip server-certificate validation. This is intended only for the case where the io7app and the MQTT broker run on the **same machine** (e.g. localhost), where you may not have a CA cert to validate against. Do **not** use it over an untrusted network — it disables protection against man-in-the-middle attacks. Defaults to off (verification enabled).
 
 **Logging.** Set `IO7_LOG=DEBUG` (or `INFO`) when developing — you'll see registered handlers, every received message, every command published, and inject fires. Defaults to `ERROR` so a production app stays quiet. You can also override per-instance: `App(log_level="DEBUG")`.
 

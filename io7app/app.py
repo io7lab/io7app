@@ -3,6 +3,7 @@ import inspect
 import json
 import logging
 import os
+import ssl
 from typing import Optional
 
 import paho.mqtt.client as mqtt
@@ -64,7 +65,12 @@ def _build_mqtt_client(app_id: str, token: str, ca: str | None) -> mqtt.Client:
         api_kw["callback_api_version"] = mqtt.CallbackAPIVersion.VERSION2
     client = mqtt.Client(client_id=app_id, clean_session=True, **api_kw)
     if ca:
-        client.tls_set(ca_certs=ca)
+        ignore_tls_verify = (os.getenv("IO7_IGNORE_TLS_VERIFY") or "0").strip().lower()
+        if ignore_tls_verify in ("1", "true", "yes"):
+            client.tls_set(ca_certs=None, cert_reqs=ssl.CERT_NONE)
+        else:
+            client.tls_set(ca_certs=ca)
+
     return client
 
 
