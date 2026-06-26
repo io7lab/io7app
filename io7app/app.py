@@ -57,23 +57,6 @@ def _configure_logger(level_name: str) -> None:
         logger.addHandler(h)
 
 
-def _build_mqtt_client(app_id: str, token: str, ca: str | None) -> mqtt.Client:
-    # paho 2.x prefers VERSION2 callbacks (V1 is deprecated).
-    # paho 1.x has no CallbackAPIVersion at all.
-    api_kw = {}
-    if hasattr(mqtt, "CallbackAPIVersion"):
-        api_kw["callback_api_version"] = mqtt.CallbackAPIVersion.VERSION2
-    client = mqtt.Client(client_id=app_id, clean_session=True, **api_kw)
-    if ca:
-        ignore_tls_verify = (os.getenv("IO7_IGNORE_TLS_VERIFY") or "0").strip().lower()
-        if ignore_tls_verify in ("1", "true", "yes"):
-            client.tls_set(ca_certs=None, cert_reqs=ssl.CERT_NONE)
-        else:
-            client.tls_set(ca_certs=ca)
-
-    return client
-
-
 class App:
     def __init__(
         self,
@@ -97,20 +80,11 @@ class App:
         self.server = server or os.getenv("IO7_SERVER")
         self.app_id = app_id or os.getenv("IO7_APP_ID")
         self.token = token or os.getenv("IO7_TOKEN")
-        env_port = os.getenv("IO7_PORT")
-        env_ca = os.getenv("IO7_CA")
-        self.ca = ca if ca is not None else env_ca
         # Auto-detect ca.pem in cwd if no explicit ca
-        if not self.ca and os.path.exists("ca.pem"):
-            self.ca = "ca.pem"
-        # Port default depends on TLS
-        default_port = 8883 if self.ca else 1883
-        if port is not None:
-            self.port = port
-        elif env_port:
-            self.port = int(env_port)
-        else:
-            self.port = default_port
+        self.ca = ca or os.getenv("IO7_CA") or ("ca.pem" if os.path.exists("ca.pem") else None)
+
+        env_port = int(os.getenv("IO7_PORT")) if os.getenv("IO7_PORT") else None
+        self.port = port or env_port or None
 
         missing = [k for k, v in (
             ("IO7_SERVER", self.server),
@@ -136,7 +110,23 @@ class App:
         return cls(env_path=env_path, **kwargs)
 
     def _build_client(self):
-        self._client = _build_mqtt_client(self.app_id, self.token, self.ca)
+        # paho 2.x prefers VERSION2 callbacks (V1 is deprecated).
+        # paho 1.x has no CallbackAPIVersion at all.
+        api_kw = {}
+        if hasattr(mqtt, "CallbackAPIVersion"):
+            api_kw["callback_api_version"] = mqtt.CallbackAPIVersion.VERSION2
+
+        self._client = mqtt.Client(client_id=self.app_id, clean_session=True, **api_kw)
+        ignore_tls_verify = (os.getenv("IO7_IGNORE_TLS_VERIFY") or "0").strip().lower()
+        if ignore_tls_verify in ("1", "true", "yes"):
+            self._client.tls_set(ca_certs=None, cert_reqs=ssl.CERT_NONE)
+            self.port = self.port or 8883
+        elif self.ca:
+            self._client.tls_set(ca_certs=self.ca)
+            self.port = self.port or 8883
+        else:
+            self.port = self.port or 1883
+
         self._client.username_pw_set(self.app_id, self.token)
         self._client.on_connect = self._on_connect
         self._client.on_message = self._on_message

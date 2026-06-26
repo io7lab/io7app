@@ -28,7 +28,7 @@ IO7_TOKEN=app3
 
 TLS is auto-detected: if `IO7_CA` is set, or if a file named `ca.pem` exists in the working directory, the connection upgrades to TLS on port 8883. Same convention as `io7lab/IO7FuPython`.
 
-**Skipping certificate verification.** Set `IO7_IGNORE_TLS_VERIFY=1` (also accepts `true`/`yes`, case-insensitive) to keep TLS encryption on port 8883 but skip server-certificate validation. This is intended only for the case where the io7app and the MQTT broker run on the **same machine** (e.g. localhost), where you may not have a CA cert to validate against. Do **not** use it over an untrusted network — it disables protection against man-in-the-middle attacks. Defaults to off (verification enabled).
+**Skipping certificate verification.** Set `IO7_IGNORE_TLS_VERIFY=1` (also accepts `true`/`yes`, case-insensitive) to keep TLS encryption on port 8883 but skip server-certificate validation. This works **even when no `IO7_CA`/`ca.pem` is configured** — it forces TLS on 8883 on its own. It is intended only for the case where the io7app and the MQTT broker run on the **same machine** (e.g. localhost), where you may not have a CA cert to validate against. Do **not** use it over an untrusted network — it disables protection against man-in-the-middle attacks. Defaults to off (verification enabled).
 
 **Logging.** Set `IO7_LOG=DEBUG` (or `INFO`) when developing — you'll see registered handlers, every received message, every command published, and inject fires. Defaults to `ERROR` so a production app stays quiet. You can also override per-instance: `App(log_level="DEBUG")`.
 
@@ -46,7 +46,7 @@ Each `recv` line shows the topic, then the handler call(s) the framework is abou
 
 The framework only configures its own `io7app` logger and adds a stream handler if no logging is configured anywhere — your own logging setup is left alone, and pytest's `caplog` works as expected.
 
-Tested by: `test_app.py::test_env_loaded`, `test_app.py::test_tls_auto_detect_from_kwarg`, `::test_tls_auto_detect_from_env`, `::test_tls_auto_detect_from_capem_in_cwd`, `::test_no_tls_default_port_1883`, `::test_log_level_default_is_error`, `::test_log_level_from_env`, `::test_log_level_kwarg_wins`, `::test_log_level_invalid_rejected`.
+Tested by: `test_app.py::test_env_loaded`, `test_app.py::test_tls_auto_detect_from_kwarg`, `::test_tls_auto_detect_from_env`, `::test_tls_auto_detect_from_capem_in_cwd`, `::test_no_tls_default_port_1883`, `::test_port_from_env_is_int`, `::test_ignore_tls_verify_uses_cert_none_on_8883`, `::test_log_level_default_is_error`, `::test_log_level_from_env`, `::test_log_level_kwarg_wins`, `::test_log_level_invalid_rejected`.
 
 ---
 

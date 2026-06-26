@@ -78,9 +78,11 @@ def app(monkeypatch, tmp_path, fake_client):
     monkeypatch.setenv("IO7_APP_ID", "testapp")
     monkeypatch.setenv("IO7_TOKEN", "t")
     monkeypatch.delenv("IO7_CA", raising=False)
+    # App now builds the paho client inline in _build_client(); patch the
+    # mqtt.Client constructor itself so our fake is returned instead.
     monkeypatch.setattr(
-        "io7app.app._build_mqtt_client",
-        lambda app_id, token, ca: fake_client,
+        "io7app.app.mqtt.Client",
+        lambda *args, **kwargs: fake_client,
     )
     a = App(_connect=True)
     return a

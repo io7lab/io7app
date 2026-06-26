@@ -1,3 +1,5 @@
+import ssl
+
 import pytest
 from io7app.app import App
 
@@ -31,47 +33,55 @@ def test_missing_config_raises(monkeypatch, tmp_path):
         App(_connect=False)
 
 
-def test_tls_auto_detect_from_kwarg(tmp_path, monkeypatch):
+# NOTE: the effective port default (8883 with TLS, 1883 without) is resolved
+# in _build_client() at connect time, not in __init__. So these tests build
+# the client (with the fake injected) before asserting the port.
+
+def test_tls_auto_detect_from_kwarg(tmp_path, monkeypatch, fake_client):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("IO7_SERVER", "h")
     monkeypatch.setenv("IO7_APP_ID", "a")
     monkeypatch.setenv("IO7_TOKEN", "t")
+    monkeypatch.setattr("io7app.app.mqtt.Client", lambda *a, **k: fake_client)
     (tmp_path / "myca.pem").write_text("dummy")
-    app = App(ca=str(tmp_path / "myca.pem"), _connect=False)
+    app = App(ca=str(tmp_path / "myca.pem"), _connect=True)
     assert app.ca == str(tmp_path / "myca.pem")
     assert app.port == 8883
 
 
-def test_tls_auto_detect_from_env(tmp_path, monkeypatch):
+def test_tls_auto_detect_from_env(tmp_path, monkeypatch, fake_client):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("IO7_SERVER", "h")
     monkeypatch.setenv("IO7_APP_ID", "a")
     monkeypatch.setenv("IO7_TOKEN", "t")
     monkeypatch.setenv("IO7_CA", "envca.pem")
-    app = App(_connect=False)
+    monkeypatch.setattr("io7app.app.mqtt.Client", lambda *a, **k: fake_client)
+    app = App(_connect=True)
     assert app.ca == "envca.pem"
     assert app.port == 8883
 
 
-def test_tls_auto_detect_from_capem_in_cwd(tmp_path, monkeypatch):
+def test_tls_auto_detect_from_capem_in_cwd(tmp_path, monkeypatch, fake_client):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("IO7_SERVER", "h")
     monkeypatch.setenv("IO7_APP_ID", "a")
     monkeypatch.setenv("IO7_TOKEN", "t")
     monkeypatch.delenv("IO7_CA", raising=False)
+    monkeypatch.setattr("io7app.app.mqtt.Client", lambda *a, **k: fake_client)
     (tmp_path / "ca.pem").write_text("dummy")
-    app = App(_connect=False)
+    app = App(_connect=True)
     assert app.ca == "ca.pem"
     assert app.port == 8883
 
 
-def test_no_tls_default_port_1883(tmp_path, monkeypatch):
+def test_no_tls_default_port_1883(tmp_path, monkeypatch, fake_client):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("IO7_SERVER", "h")
     monkeypatch.setenv("IO7_APP_ID", "a")
     monkeypatch.setenv("IO7_TOKEN", "t")
     monkeypatch.delenv("IO7_CA", raising=False)
-    app = App(_connect=False)
+    monkeypatch.setattr("io7app.app.mqtt.Client", lambda *a, **k: fake_client)
+    app = App(_connect=True)
     assert app.ca is None
     assert app.port == 1883
 
@@ -84,6 +94,31 @@ def test_explicit_port_overrides_default(tmp_path, monkeypatch):
     (tmp_path / "ca.pem").write_text("dummy")
     app = App(port=9999, _connect=False)
     assert app.port == 9999
+
+
+def test_port_from_env_is_int(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("IO7_SERVER", "h")
+    monkeypatch.setenv("IO7_APP_ID", "a")
+    monkeypatch.setenv("IO7_TOKEN", "t")
+    monkeypatch.delenv("IO7_CA", raising=False)
+    monkeypatch.setenv("IO7_PORT", "1234")
+    app = App(_connect=False)
+    assert app.port == 1234
+    assert isinstance(app.port, int)
+
+
+def test_ignore_tls_verify_uses_cert_none_on_8883(tmp_path, monkeypatch, fake_client):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("IO7_SERVER", "h")
+    monkeypatch.setenv("IO7_APP_ID", "a")
+    monkeypatch.setenv("IO7_TOKEN", "t")
+    monkeypatch.delenv("IO7_CA", raising=False)
+    monkeypatch.setenv("IO7_IGNORE_TLS_VERIFY", "1")
+    monkeypatch.setattr("io7app.app.mqtt.Client", lambda *a, **k: fake_client)
+    app = App(_connect=True)
+    assert app.port == 8883
+    assert fake_client.tls_set_calls == [{"ca_certs": None, "cert_reqs": ssl.CERT_NONE}]
 
 
 # --- IO7_LOG / log_level handling ---
