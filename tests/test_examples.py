@@ -33,7 +33,7 @@ def test_switch_lamp(app, fake_client, monkeypatch):
 
 
 def test_thermostat_valve(app, fake_client, monkeypatch):
-    _load("02_thermostat_valve", app, monkeypatch)
+    _load("04_thermostat_valve", app, monkeypatch)
     assert "iot3/thermo1/evt/status/fmt/json" in fake_client.subscribed
     # Cold reading drives valve on
     fake_client.deliver("iot3/thermo1/evt/status/fmt/json",
@@ -42,8 +42,8 @@ def test_thermostat_valve(app, fake_client, monkeypatch):
     assert "iot3/valve1/cmd/valve/fmt/json" in cmds
 
 
-def test_lux_auto_lamp(app, fake_client, monkeypatch):
-    _load("03_lux_auto_lamp", app, monkeypatch)
+def test_lux_lamp(app, fake_client, monkeypatch):
+    _load("02_lux_lamp", app, monkeypatch)
     assert "iot3/lux1/evt/status/fmt/json" in fake_client.subscribed
     fake_client.deliver("iot3/lux1/evt/status/fmt/json", '{"d": {"lux": 10}}')
     assert any(t == "iot3/lamp1/cmd/lamp/fmt/json"
@@ -51,19 +51,19 @@ def test_lux_auto_lamp(app, fake_client, monkeypatch):
 
 
 def test_scheduled_inject(app, fake_client, monkeypatch):
-    _load("04_scheduled_inject", app, monkeypatch)
+    _load("05_scheduled_inject", app, monkeypatch)
     assert any(name in app._scheduler._jobs
                for name in ("morning", "refresh"))
 
 
 def test_wildcard_trace(app, fake_client, monkeypatch):
-    _load("05_wildcard_trace", app, monkeypatch)
+    _load("06_wildcard_trace", app, monkeypatch)
     assert "iot3/+/evt/+/fmt/json" in fake_client.subscribed
 
 
-def test_filtered_lighting(app, fake_client, monkeypatch):
+def test_lux_auto_lamp(app, fake_client, monkeypatch):
     import json as _json
-    _load("06_filtered_lighting", app, monkeypatch)
+    _load("03_lux_auto_lamp", app, monkeypatch)
     assert "iot3/lux1/evt/status/fmt/json" in fake_client.subscribed
     assert "iot3/sw1/evt/status/fmt/json" in fake_client.subscribed
     assert "iot3/lamp1/evt/status/fmt/json" in fake_client.subscribed

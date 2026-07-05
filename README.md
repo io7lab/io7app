@@ -139,13 +139,13 @@ Then `docker compose up -d io7-app`. Compose places the service on the project's
 
 - Version 0.2.0
 - Under 900 lines of Python across four small modules (router, scheduler, filter, app)
-- 94 tests, all green
+- 97 tests, all green
 - Runtime deps: `paho-mqtt` (MQTT) and `python-dotenv` (config). Optional: `croniter` for cron schedules.
 
 ## Where to go next
 
 - **[USER_GUIDE.md](USER_GUIDE.md)** — write your first app, decorator reference, scheduling, dynamic register/unregister, debug logging. Every claim in the guide is exercised by a test.
-- **[examples/](examples/)** — six runnable apps: switch/lamp, thermostat/valve, lux auto-lamp, scheduled inject, wildcard tracing, filtered auto-lighting triangle (lux + switch ↔ lamp).
+- **[examples/](examples/)** — six runnable apps: switch/lamp, lux/lamp, lux auto-lamp triangle (lux + switch ↔ lamp, filtered), thermostat/valve, scheduled inject, wildcard tracing.
 - **[docs/superpowers/specs/](docs/superpowers/specs/)** — design document.
 - **[docs/superpowers/plans/](docs/superpowers/plans/)** — implementation plan.
 
@@ -161,7 +161,7 @@ pytest
 
 ## Design principles
 
-- **Small.** Three modules, one class, four decorators.
+- **Small.** Four modules, two classes, four decorators.
 - **Intuitive.** A working app is 3-5 lines of business logic.
 - **Honest.** No magic — handler signatures are inspected, not assumed; dropped messages are silent only when the spec says so; warnings spell out exactly what was deduplicated and why.
 - **Optimal where it counts.** Static topics dispatch in O(1); wildcards compile to a regex once; overlapping decorators are consolidated at registration time so handlers never double-fire.

@@ -205,7 +205,7 @@ Semantics worth knowing:
 - **Loop-free syncs**: a command's echo (the device republishing the
   state just set) equals the filter's reference and is dropped, so
   bidirectional mirrors (switch ↔ lamp) settle after one round instead
-  of looping. See `examples/06_filtered_lighting.py`.
+  of looping. See `examples/03_lux_auto_lamp.py`.
 - **`valid=(...)`** rejects unexpected values *before* they can pollute
   the change detection (logged at WARNING).
 - **Deltas** compare against the last value that **passed**; `max_delta`
@@ -401,11 +401,11 @@ Each is a runnable file under `examples/`. Tested by an integration test that im
 | File | What it does | Test |
 |---|---|---|
 | `01_switch_lamp.py` | switch1 → lamp1 mirror | `test_examples.py::test_switch_lamp` |
-| `02_thermostat_valve.py` | thermo1 temperature drives valve1 with hysteresis | `test_examples.py::test_thermostat_valve` |
-| `03_lux_auto_lamp.py` | lux1 turns lamp1 on at low light | `test_examples.py::test_lux_auto_lamp` |
-| `04_scheduled_inject.py` | daily morning lamp on (cron) + periodic command refresh | `test_examples.py::test_scheduled_inject` |
-| `05_wildcard_trace.py` | log all events from any device, then unregister after delay | `test_examples.py::test_wildcard_trace` |
-| `06_filtered_lighting.py` | lux + sw1 drive lamp1, lamp1 syncs sw1 back — one filter on the lamp event keeps the triangle loop-free | `test_examples.py::test_filtered_lighting` |
+| `02_lux_lamp.py` | lux1 turns lamp1 on at low light | `test_examples.py::test_lux_lamp` |
+| `03_lux_auto_lamp.py` | lux + sw1 drive lamp1, lamp1 syncs sw1 back — one filter on the lamp event keeps the triangle loop-free | `test_examples.py::test_lux_auto_lamp` |
+| `04_thermostat_valve.py` | thermo1 temperature drives valve1 with hysteresis | `test_examples.py::test_thermostat_valve` |
+| `05_scheduled_inject.py` | daily morning lamp on (cron) + periodic command refresh | `test_examples.py::test_scheduled_inject` |
+| `06_wildcard_trace.py` | log all events from any device, then unregister after delay | `test_examples.py::test_wildcard_trace` |
 
 ---
 
