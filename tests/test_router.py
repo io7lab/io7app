@@ -181,3 +181,58 @@ def test_remove_by_name_removes_all_tiers():
     # g still works
     assert len(r.dispatch("iot3/lamp1/cmd/lamp/fmt/json")) == 1
     assert r.dispatch("iot3/lamp1/evt/status/fmt/json") == []
+
+
+def test_dispatch_is_atomic_under_concurrent_unregister():
+    """dispatch() must never miss an unrelated handler while another
+    thread churns registrations (timers / @inject threads may call
+    add/remove while the network thread dispatches)."""
+    import threading
+
+    r = Router()
+
+    def keeper(t, p): pass
+    def churner(t, p): pass
+
+    r.add("iot3/+/evt/keep/fmt/json", keeper, "keeper")
+
+    stop = threading.Event()
+
+    def churn():
+        while not stop.is_set():
+            r.add("iot3/+/evt/churn/fmt/json", churner, "churner")
+            r.remove_by_name("churner")
+
+    t = threading.Thread(target=churn, daemon=True)
+    t.start()
+    try:
+        for _ in range(2000):
+            names = [e.name for e in r.dispatch("iot3/dev1/evt/keep/fmt/json")]
+            assert names == ["keeper"]
+    finally:
+        stop.set()
+        t.join(timeout=2.0)
+
+
+def test_dispatch_serializes_with_mutations():
+    """dispatch() participates in the router lock: while a mutation holds
+    it, dispatch waits instead of iterating mid-mutation state."""
+    import threading
+
+    r = Router()
+
+    def keeper(t, p): pass
+    r.add("iot3/+/evt/keep/fmt/json", keeper, "keeper")
+
+    result = {}
+
+    def do_dispatch():
+        result["names"] = [e.name for e in r.dispatch("iot3/dev1/evt/keep/fmt/json")]
+
+    with r._lock:  # simulate an in-progress add/remove from another thread
+        t = threading.Thread(target=do_dispatch, daemon=True)
+        t.start()
+        t.join(timeout=0.2)
+        assert t.is_alive()  # dispatch is blocked on the lock
+    t.join(timeout=2.0)
+    assert result["names"] == ["keeper"]

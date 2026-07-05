@@ -1,10 +1,22 @@
 """Topic router: matching + registration consolidation."""
 from collections import namedtuple
 from typing import Callable
+import functools
 import logging
 import re
+import threading
 
 log = logging.getLogger("io7app")
+
+
+def _locked(method):
+    """Serialize Router mutation/lookup: dispatch runs on the MQTT network
+    thread while add/remove may come from timers or @inject threads."""
+    @functools.wraps(method)
+    def wrapper(self, *args, **kwargs):
+        with self._lock:
+            return method(self, *args, **kwargs)
+    return wrapper
 
 Entry = namedtuple("Entry", ["handler", "name", "pattern", "fmt"])
 
@@ -64,7 +76,10 @@ class Router:
         self._exact: dict[str, list[Entry]] = {}
         self._single: list[tuple[re.Pattern, list[Entry], str]] = []
         self._multi: list[tuple[re.Pattern, list[Entry], str]] = []
+        # RLock: add() calls _patterns_for_name() internally.
+        self._lock = threading.RLock()
 
+    @_locked
     def add(self, pattern: str, handler: Callable, name: str) -> bool:
         """Register (pattern, handler, name). Apply consolidation rules.
         Returns True if the pattern is newly subscribed (caller should subscribe).
@@ -122,6 +137,7 @@ class Router:
         bucket.append((_compile(pattern), [entry], pattern))
         return True
 
+    @_locked
     def dispatch(self, topic: str) -> list[Entry]:
         out: list[Entry] = []
         out.extend(self._exact.get(topic, []))
@@ -133,6 +149,7 @@ class Router:
                 out.extend(entries)
         return out
 
+    @_locked
     def all_patterns(self) -> set[str]:
         """Every currently-registered topic pattern across all tiers.
         Used by App to enumerate MQTT subscriptions on (re)connect."""
@@ -143,6 +160,7 @@ class Router:
 
     # --- internals ---
 
+    @_locked
     def _patterns_for_name(self, name: str) -> list[str]:
         out: list[str] = []
         for p, entries in self._exact.items():
@@ -172,6 +190,7 @@ class Router:
                         bucket[i] = (rgx, new_entries, p)
                     return
 
+    @_locked
     def remove_by_name(self, name: str) -> set[str]:
         """Remove every entry where entry.name == name across all tiers.
         Returns the set of patterns that have no remaining handlers

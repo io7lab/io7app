@@ -6,7 +6,7 @@ app = App()
 
 @app.on_event("lux1", "status")
 def auto_lamp(data):
-    desired = "on" if data["lux"] < 50 else "off"
+    desired = "on" if data["lux"] < 300 else "off"
     app.send_cmd("lamp1", "lamp", {"lamp": desired})
 
 

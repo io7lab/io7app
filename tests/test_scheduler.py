@@ -126,3 +126,25 @@ def test_inject_with_t_param():
     payload, t = seen[0]
     assert payload == {"k": 1}
     assert isinstance(t, float) and t > 0
+
+
+def test_inject_can_cancel_itself():
+    """An injected function cancelling its own job must not raise
+    (cancel() would otherwise join the current thread)."""
+    import threading
+
+    s = Scheduler()
+    done = threading.Event()
+    result = {}
+
+    def f(payload):
+        result["cancelled"] = s.cancel("f")   # must not raise
+        done.set()
+
+    s.schedule("f", f, every=0.05, at_start=True)
+    s.start()
+    assert done.wait(2.0)
+    assert result["cancelled"] is True
+    assert "f" not in s._jobs
+    time.sleep(0.2)  # thread observes its stop_event and exits
+    assert not any(t.name == "io7-inject-f" for t in threading.enumerate())

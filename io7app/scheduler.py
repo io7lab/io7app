@@ -54,7 +54,9 @@ class Scheduler:
         if not job:
             return False
         job.stop_event.set()
-        if job.thread:
+        # An injected function may cancel itself (its own job name);
+        # joining the current thread would raise RuntimeError.
+        if job.thread and job.thread is not threading.current_thread():
             job.thread.join(timeout=2.0)
         return True
 
