@@ -37,6 +37,8 @@ You have two ways to run an io7app: as a normal pip package on your machine, or 
   IO7_SERVER=iot201.ddns.net
   IO7_APP_ID=app3
   IO7_TOKEN=app3
+  # IO7_IGNORE_TLS_VERIFY=0  # optional, 1/true/yes skips cert verification (default off)
+  # IO7_LOG=ERROR      # DEBUG | INFO | WARNING | ERROR | CRITICAL (default ERROR)
   ```
   TLS, port overrides, and log levels are documented in the [user guide](USER_GUIDE.md).
 
@@ -60,8 +62,6 @@ Available on [PyPI](https://pypi.org/project/io7app/). Requires Python ≥ 3.10:
 
 ```bash
 pip install io7app
-# Optional, only if you use @inject(cron=...)
-pip install io7app[cron]
 ```
 
 Then in the directory containing `app.py` and `.env`:
