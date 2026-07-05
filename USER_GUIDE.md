@@ -4,6 +4,8 @@
 
 You write the business logic — "if a switch flips, mirror it to the lamp", "if it's 7am, turn the heater on". The framework handles the MQTT connection, topic subscriptions, envelope wrapping, scheduling, and dynamic register/unregister.
 
+The intended shape of an app is **many small functions, one concern each**. Several functions may listen to the same event — the runtime stacks them and invokes every one, isolated from each other's failures (§3.1) — and the report-by-exception filter (§3.5) gates each function so it fires only when the element it cares about actually changes. Decompose the problem, write each piece as its own handler, and let dispatch and filtering do the coordination.
+
 > **The io7 platform.** Devices publish *events* and receive *commands* through an MQTT broker. Apps subscribe to events and publish commands. This library implements only the **App** side. There can be many devices but typically one app per process.
 
 ---
@@ -100,7 +102,14 @@ Subscribes to `iot3/thermo1/evt/status/fmt/json`. Wildcards work too:
 @app.on_event("thermo1", "+")       # any event from thermo1
 ```
 
-Tested by: `test_app.py::test_on_event_topic_built`, `::test_on_event_with_wildcards`, `test_router.py::test_single_wildcard_plus`, `::test_multi_wildcard_hash`, `::test_hash_with_plus_combined`.
+**Handlers stack.** Any number of (differently named) functions may register
+the same event — every one of them fires for every matching report, in
+registration order, and an exception in one never stops the others. This is
+the intended way to structure an app: split the logic into one function per
+concern rather than one big handler, and add `@app.filter` (§3.5) when a
+function should only wake on changes to its element.
+
+Tested by: `test_app.py::test_on_event_topic_built`, `::test_on_event_with_wildcards`, `::test_handler_isolation_other_handlers_still_run`, `test_filter.py::test_stacked_handlers_each_focus_on_one_element`, `test_router.py::test_single_wildcard_plus`, `::test_multi_wildcard_hash`, `::test_hash_with_plus_combined`.
 
 ### 3.2 `@app.on(pattern)` — raw topic for full power
 
@@ -157,6 +166,75 @@ For non-JSON formats:
 - Any other format → `data` is raw `bytes`.
 
 Tested by: `test_app.py::test_unwraps_d`, `::test_drops_when_no_d`, `::test_drops_when_not_dict`, `::test_drops_malformed_json`, `::test_utf8_format_no_unwrap`.
+
+### 3.5 `@app.filter` — report-by-exception (RBE) change filter
+
+io7 devices republish their unchanged state every few seconds, and echo a
+status right after obeying a command. `@app.filter` gates a handler so it
+fires only when the watched element of the payload **actually changes** —
+modeled on Node-RED's filter (rbe) node. Apply it **below** the
+registration decorator:
+
+```python
+@app.on_event("sw1", "status")
+@app.filter("switch", valid=("on", "off"))
+def on_switch(data):
+    app.send_cmd("lamp1", "lamp", {"lamp": data["switch"]})
+```
+
+The filter watches one element and ignores the rest of the payload:
+`{"switch": "on", "brightness": 555}` after `{"switch": "on",
+"brightness": 333}` is dropped; `{"switch": "off", ...}` passes. Dotted
+paths reach nested elements (`"sensor.lux"`); `key=None` watches the
+whole payload (utf8/raw formats).
+
+| Node-RED filter node | `@app.filter` |
+|---|---|
+| block unless value changes | `act_on_first=True` |
+| block unless value changes (ignore initial value) | *(default)* |
+| block unless value change ≥ N (deadband) | `min_delta=N` |
+| block if value change > N (narrowband) | `max_delta=N` |
+| Property `msg.payload.d.sensor.lux` | `key="sensor.lux"` |
+
+Semantics worth knowing:
+
+- **Default vs `act_on_first`**: by default the first report only
+  initializes the reference — an app restart doesn't re-trigger actions
+  for state that isn't changing. `act_on_first=True` also fires on that
+  first value (use it when the handler must sync up immediately).
+- **Loop-free syncs**: a command's echo (the device republishing the
+  state just set) equals the filter's reference and is dropped, so
+  bidirectional mirrors (switch ↔ lamp) settle after one round instead
+  of looping. See `examples/06_filtered_lighting.py`.
+- **`valid=(...)`** rejects unexpected values *before* they can pollute
+  the change detection (logged at WARNING).
+- **Deltas** compare against the last value that **passed**; `max_delta`
+  rejects one-off spikes — a persistent step past N never passes.
+- **State is per function, so stacked handlers compose.** Any number of
+  functions can share the same `@app.on_event` signature — the runtime
+  stacks them and each keeps its own filter state. That lets each
+  function focus on one element of the event:
+
+  ```python
+  @app.on_event("dimmer1", "status")
+  @app.filter("switch")                       # fires on power flips
+  def on_power(data): ...
+
+  @app.on_event("dimmer1", "status")
+  @app.filter("brightness", min_delta=10)     # fires on real level moves
+  def on_level(data): ...
+  ```
+
+  The flip side: one function registered on a **wildcard** pattern (or on
+  several patterns) shares a single filter state across every matching
+  topic, which defeats change detection for interleaved devices — the
+  framework logs a warning. Register one filtered function per device
+  topic.
+- `app.unregister(name)` works unchanged through a filter.
+- The gate is transparent to dispatch: every signature form from §3.3
+  (`data`, `topic`, `t`) keeps working behind a filter.
+
+Tested by: `test_filter.py` (unit modes + dispatch integration).
 
 ---
 
@@ -327,6 +405,7 @@ Each is a runnable file under `examples/`. Tested by an integration test that im
 | `03_lux_auto_lamp.py` | lux1 turns lamp1 on at low light | `test_examples.py::test_lux_auto_lamp` |
 | `04_scheduled_inject.py` | daily morning lamp on (cron) + periodic command refresh | `test_examples.py::test_scheduled_inject` |
 | `05_wildcard_trace.py` | log all events from any device, then unregister after delay | `test_examples.py::test_wildcard_trace` |
+| `06_filtered_lighting.py` | lux + sw1 drive lamp1, lamp1 syncs sw1 back — one filter on the lamp event keeps the triangle loop-free | `test_examples.py::test_filtered_lighting` |
 
 ---
 

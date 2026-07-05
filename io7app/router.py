@@ -16,7 +16,7 @@ def _fmt_of(pattern: str) -> str | None:
     return None
 
 
-def _wildcard_kind(pattern: str) -> str:
+def wildcard_kind(pattern: str) -> str:
     parts = pattern.split("/")
     if parts[-1] == "#":
         return "multi"
@@ -109,7 +109,7 @@ class Router:
 
         # Insert
         entry = Entry(handler, name, pattern, _fmt_of(pattern))
-        kind = _wildcard_kind(pattern)
+        kind = wildcard_kind(pattern)
         if kind == "exact":
             is_new = pattern not in self._exact
             self._exact.setdefault(pattern, []).append(entry)

@@ -6,7 +6,9 @@
 
 A small, intuitive Python framework for writing **app servers** on the [io7 IoT platform](https://github.com/io7lab/).
 
-You decorate Python functions with the device events they react to and the schedules they fire on. The framework owns the MQTT connection, topic routing, JSON envelope handling, scheduling, and dynamic register/unregister. Your code stays focused on business logic.
+You decorate Python functions with the device events they react to and the schedules they fire on. The programming model is **one small function per concern**: any number of functions can subscribe to the *same* event — the runtime stacks them and fires each independently — and a report-by-exception filter (`@app.filter`) lets each function wake only when *its* element of the event actually changes. A dimmer's power flips, its brightness moves, and an audit log each live in their own three-line function instead of one entangled handler.
+
+The framework owns the MQTT connection, topic routing, JSON envelope handling, the filters, scheduling, and dynamic register/unregister. Your code stays focused on business logic.
 
 **Demo:** [YouTube walkthrough](https://youtu.be/nGQX1Ks-418)
 
@@ -135,15 +137,15 @@ Then `docker compose up -d io7-app`. Compose places the service on the project's
 
 ## Status
 
-- Version 0.1.0
-- Under 700 lines of Python across three small modules (router, scheduler, app)
-- 71 tests, all green
+- Version 0.2.0
+- Under 900 lines of Python across four small modules (router, scheduler, filter, app)
+- 94 tests, all green
 - Runtime deps: `paho-mqtt` (MQTT) and `python-dotenv` (config). Optional: `croniter` for cron schedules.
 
 ## Where to go next
 
 - **[USER_GUIDE.md](USER_GUIDE.md)** — write your first app, decorator reference, scheduling, dynamic register/unregister, debug logging. Every claim in the guide is exercised by a test.
-- **[examples/](examples/)** — five runnable apps: switch/lamp, thermostat/valve, lux auto-lamp, scheduled inject, wildcard tracing.
+- **[examples/](examples/)** — six runnable apps: switch/lamp, thermostat/valve, lux auto-lamp, scheduled inject, wildcard tracing, filtered auto-lighting triangle (lux + switch ↔ lamp).
 - **[docs/superpowers/specs/](docs/superpowers/specs/)** — design document.
 - **[docs/superpowers/plans/](docs/superpowers/plans/)** — implementation plan.
 

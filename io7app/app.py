@@ -1,4 +1,5 @@
 """App class: wires paho-mqtt, Router, Scheduler."""
+import functools
 import inspect
 import json
 import logging
@@ -9,7 +10,8 @@ from typing import Optional
 import paho.mqtt.client as mqtt
 from dotenv import load_dotenv
 
-from io7app.router import Router
+from io7app.filter import Filter
+from io7app.router import Router, wildcard_kind
 from io7app.scheduler import Scheduler
 
 log = logging.getLogger("io7app")
@@ -150,6 +152,19 @@ class App:
         """Decorator: register `fn` as a handler for the topic `pattern`."""
         def decorator(fn):
             name = fn.__name__
+            # A filter's change state lives per function. One function on a
+            # wildcard pattern (or several patterns) sees every matching
+            # topic through a single reference value — interleaved devices
+            # then defeat the change detection.
+            if getattr(fn, "_io7_filter", None) is not None and (
+                    wildcard_kind(pattern) != "exact"
+                    or self._router._patterns_for_name(name)):
+                log.warning(
+                    "handler %r has a filter but %s matches multiple topics/"
+                    "registrations — filter state is shared across all of "
+                    "them; register one filtered function per device topic",
+                    name, pattern,
+                )
             is_new = self._router.add(pattern, fn, name)
             log.info("registered %r on %s%s", name, pattern,
                      "" if is_new else " (existing pattern)")
@@ -232,6 +247,59 @@ class App:
     def on_event(self, device_id: str, event_id: str, fmt: str = "json"):
         topic = f"iot3/{device_id}/evt/{event_id}/fmt/{fmt}"
         return self.on(topic)
+
+    def filter(self, key=None, *, act_on_first=False, valid=None,
+               min_delta=None, max_delta=None):
+        """Decorator: gate a handler behind a report-by-exception (RBE)
+        change filter, like Node-RED's filter (rbe) node. The handler
+        fires only when the watched element of the payload actually
+        changes — the ~5 s periodic device republishes and the echo of
+        the app's own commands are dropped.
+
+        Apply it BELOW the registration decorator, so the filtered
+        handler is what gets registered:
+
+            @app.on_event("sw1", "status")
+            @app.filter("switch", valid=("on", "off"))
+            def on_switch(data):
+                app.send_cmd("lamp1", "lamp", {"lamp": data["switch"]})
+
+        Modes (see io7app.filter.Filter): act_on_first also fires on the
+        first value seen; valid rejects unexpected values; min_delta is a
+        numeric deadband; max_delta a narrowband spike rejector. key is a
+        dotted path into the payload ("sensor.lux"); None watches the
+        whole payload (utf8/raw formats).
+
+        The gate is transparent to dispatch: every handler signature form
+        keeps working ((data), (topic, data), (data, t), (topic, data, t)).
+        """
+        def decorator(fn):
+            if self._router._patterns_for_name(fn.__name__):
+                log.warning(
+                    "@app.filter applied above the registration decorator for "
+                    "%r — the unfiltered handler is already registered; apply "
+                    "@app.filter below @app.on/@app.on_event",
+                    fn.__name__,
+                )
+            flt = Filter(key, act_on_first=act_on_first, valid=valid,
+                         min_delta=min_delta, max_delta=max_delta,
+                         name=fn.__name__)
+
+            @functools.wraps(fn)
+            def gated(*args, **kwargs):
+                # _invoke passes data as the only positional (or second,
+                # after topic); t always arrives as a kwarg.
+                data = args[1] if len(args) == 2 else args[0]
+                if not flt.passes(data):
+                    return None
+                return fn(*args, **kwargs)
+
+            # wraps exposes fn's signature via __wrapped__ — deliberate:
+            # _invoke must dispatch by the real handler's signature, and
+            # gated forwards its arguments verbatim.
+            gated._io7_filter = flt  # lets on() warn about shared state
+            return gated
+        return decorator
 
     def send_cmd(self, device_id: str, cmd_id: str, data, *,
                  fmt: str = "json", qos: int = 0, retain: bool = False):
