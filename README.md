@@ -111,6 +111,15 @@ The container watches `/app/app.py` and `/app/.env` and **auto-restarts** the Py
 
 If `app.py` raises an exception, the traceback shows up in `docker logs -f io7app` and the container keeps watching; fix the file and it restarts automatically.
 
+**Extra Python packages.** The image ships only io7app and its required dependencies. Install anything else your app needs with a plain `pip install` inside the running container:
+
+```bash
+docker exec io7app pip install croniter flask
+touch app.py   # restart the app so it picks them up
+```
+
+The image sets `PYTHONUSERBASE=/app/.local` and `PIP_USER=1`, so packages land in `.local/` inside your mounted working folder rather than in the container's filesystem. They survive the container being recreated (`docker compose up -d` after a config change, image updates), and their command-line tools (`flask`, `gunicorn`, …) are on `PATH`. `.local/` is created by the container's root user, so remove it from the host with `sudo rm -rf .local`, and add it to `.gitignore` if the folder is under version control.
+
 Tunables (set with `-e`):
 
 - `IO7_POLL_INTERVAL=1` — poll period in seconds (default 2).
