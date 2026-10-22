@@ -161,11 +161,9 @@ pytest
 
 ## Design principles
 
-- **Small.** Four modules, two classes, four decorators.
-- **Intuitive.** A working app is 3-5 lines of business logic.
-- **Honest.** No magic — handler signatures are inspected, not assumed; dropped messages are silent only when the spec says so; warnings spell out exactly what was deduplicated and why.
-- **Optimal where it counts.** Static topics dispatch in O(1); wildcards compile to a regex once; overlapping decorators are consolidated at registration time so handlers never double-fire.
-
-## License
+- **Small and focused.** Four modules, two classes, four decorators. io7app handles the plumbing — MQTT connection, subscriptions, payload parsing, scheduling — so your code focuses on business logic. A working app is 3-5 lines of it.
+- **Intuitive.** Decorator names say what they do; reading the code is enough to know what the app reacts to and what it sends.
+- **Transparent.** No magic — handler signatures are inspected, not assumed; dropped messages are silent only when the spec says so; warnings spell out exactly what was deduplicated and why.
+- **Optimal where it counts.** Static topics dispatch in constant time (O(1)); wildcards compile to a regex once; overlapping decorators on the same handler are consolidated at registration time so a handler never double-fires on one message.
 
 MIT — see [LICENSE](LICENSE). Same as the rest of the io7lab packages.
